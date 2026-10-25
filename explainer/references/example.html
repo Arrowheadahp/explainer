@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the internet delivers a web page</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]});"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --heading: #e6edf3;
+    --muted: #8b949e; --accent: #4fc3f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.75 "Iowan Old Style", "Source Serif 4", Georgia, serif;
+    max-width: 75ch; padding: 3rem 1.5rem 6rem;
+    margin-left: max(280px, calc(50% - 380px));
+  }
+  h1, h2, h3 { font-family: Georgia, "Iowan Old Style", "Source Serif 4", serif; color: var(--heading); line-height: 1.25; }
+  h1 { font-size: 2.4rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.65rem; margin-top: 3.25rem; }
+  h3 { font-size: 1.25rem; margin-top: 2.25rem; }
+  .subtitle { color: var(--muted); font-style: italic; margin-top: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p, li { text-wrap: pretty; }
+  sup a { color: var(--accent); font-weight: 600; }
+  .panel { background: var(--panel); border-left: 3px solid var(--accent); padding: 1rem 1.5rem; border-radius: 4px; }
+  figure { margin: 2.5rem 0; text-align: center; }
+  figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.75rem; font-style: italic; }
+  table { border-collapse: collapse; margin: 1.5rem auto; width: 100%; }
+  th, td { border-bottom: 1px solid var(--panel); padding: 0.55rem 0.9rem; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--heading); }
+  code { background: var(--panel); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.92em; }
+  .strike { text-decoration: line-through; text-decoration-color: #f85149; }
+  .good { color: #7ee787; }
+  .bad { color: #f85149; }
+  mark.unverified {
+    background: rgba(139,148,158,0.18); color: var(--muted);
+    padding: 0.05em 0.4em; border-radius: 3px; border: 1px dashed var(--muted);
+  }
+  nav#toc {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    overflow-y: auto; padding: 2.5rem 1.25rem; background: var(--panel);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.95rem;
+    z-index: 10;
+  }
+  nav#toc .toc-title { color: var(--heading); font-weight: 700; margin-bottom: 1.25rem; }
+  nav#toc a { display: block; padding: 0.35rem 0.6rem; color: var(--muted); border-left: 2px solid transparent; }
+  nav#toc a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,195,247,0.08); }
+  #nav-toggle { display: none; }
+  @media (max-width: 1100px) {
+    body { margin-left: auto; margin-right: auto; padding-top: 5rem; }
+    nav#toc {
+      transform: translateX(-100%); transition: transform 0.25s ease; width: 85vw; max-width: 320px;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.5);
+    }
+    nav#toc.open { transform: translateX(0); }
+    #nav-toggle {
+      display: block; position: fixed; top: 1rem; left: 1rem; z-index: 20;
+      background: var(--panel); color: var(--heading); border: 1px solid var(--muted);
+      border-radius: 4px; padding: 0.45rem 0.9rem; font-size: 1.15rem; cursor: pointer;
+    }
+  }
+  .mermaid { background: var(--panel); border-radius: 6px; padding: 1.5rem; }
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" aria-label="Toggle table of contents">☰</button>
+
+<nav id="toc" aria-label="Table of contents">
+  <div class="toc-title">On this page</div>
+  <a href="#prerequisites">1 · Prerequisites</a>
+  <a href="#big-picture">2 · Big picture</a>
+  <a href="#mechanism">3 · The mechanism, step by step</a>
+  <a href="#worked-example">4 · Worked example: counting the latency</a>
+  <a href="#deeper">5 · Deeper layers</a>
+  <a href="#misconceptions">6 · Common misconceptions</a>
+  <a href="#further">7 · Further exploration</a>
+  <a href="#sources">Sources</a>
+</nav>
+
+<h1>How the internet delivers a web page</h1>
+<p class="subtitle">From one line in your browser to servers on the other side of the planet — and back — in under a second.</p>
+
+<p>You type an address into your browser. A second later, a web page appears.
+Underneath that second sits a chain of machinery that took decades to build:
+a name-finding system, a reliable delivery system layered on top of an
+unreliable one, an encrypted conversation, and finally the actual page
+transfer. This page traces that chain end to end.<sup><a href="#src-1">1</a></sup></p>
+
+<h2 id="prerequisites">1 · Prerequisites</h2>
+
+<p>Three ideas, briefly, before we start.</p>
+
+<ul>
+  <li><strong>Packets.</strong> Everything sent over the internet is chopped into small
+  chunks — <em>packets</em> — each carrying a destination address and its chunk of
+  data. Packets are routed one by one, like letters through a postal system
+  that reads addresses on envelopes.<sup><a href="#src-1">1</a></sup></li>
+  <li><strong>IP addresses and DNS.</strong> Every connected machine has a numeric
+  address (like <code>142.250.190.4</code>). Humans use names like
+  <code>example.org</code>; the <em>Domain Name System</em> (DNS) is the directory that
+  translates one to the other.<sup><a href="#src-3">3</a></sup></li>
+  <li><strong>Client and server.</strong> Your browser is the <em>client</em>: it asks. The
+  machine holding the web page is the <em>server</em>: it answers. Everything below
+  is a choreography between exactly these two roles.</li>
+</ul>
+
+<h2 id="big-picture">2 · Big picture</h2>
+
+<p>Four phases, in order. First the browser converts the name
+(<code>example.org</code>) into an IP address. Then it establishes a reliable
+connection to that address. Then — usually — it upgrades that connection to
+an encrypted one. Only then does it ask for the page and receive it.</p>
+
+<figure>
+  <pre class="mermaid">
+flowchart LR
+  A["You: example.org"] --> B["1. DNS lookup"]
+  B --> C["2. TCP handshake"]
+  C --> D["3. TLS handshake"]
+  D --> E["4. HTTP request"]
+  E --> F["Page renders"]
+  style A fill:#161b22,color:#e6edf3,stroke:#4fc3f7
+  style F fill:#161b22,color:#e6edf3,stroke:#4fc3f7
+  </pre>
+  <figcaption>Figure 1 — The four phases of loading a web page.</figcaption>
+</figure>
+
+<h2 id="mechanism">3 · The mechanism, step by step</h2>
+
+<h3>3.1 Finding the server: DNS</h3>
+
+<p>Your browser checks a chain of caches — its own, the operating system's,
+your router's, your ISP's recursive resolver. If nobody has the answer
+cached, the recursive resolver walks the DNS hierarchy: it asks a
+<em>root</em> name server which server is responsible for <code>.org</code>, then asks
+the <code>.org</code> (top-level domain) server which server knows
+<code>example.org</code>, then asks that <em>authoritative</em> server for the final
+IP address.<sup><a href="#src-3">3</a></sup> The answer comes back with a
+<em>time-to-live</em> — how many seconds it may be cached.</p>
+
+<h3>3.2 Building a reliable channel: TCP</h3>
+
+<p>The internet's delivery layer (IP) is <em>best-effort</em>: packets can be lost,
+duplicated, or reordered. TCP repairs this with a three-way handshake and
+sequence numbers:</p>
+
+<figure>
+  <pre class="mermaid">
+sequenceDiagram
+  participant B as Browser
+  participant S as Server
+  B->>S: SYN (seq=x)
+  S->>B: SYN-ACK (seq=y, ack=x+1)
+  B->>S: ACK (ack=y+1)
+  Note over B,S: Connection established
+  </pre>
+  <figcaption>Figure 2 — The TCP three-way handshake.<sup><a href="#src-2">2</a></sup></figcaption>
+</figure>
+
+<p>Each byte is numbered. The sender retransmits whatever the receiver does
+not acknowledge; the receiver reassembles the bytes in order before handing
+them to the browser. This is why a download completes correctly even though
+no single network hop guaranteed anything.<sup><a href="#src-2">2</a></sup></p>
+
+<h3>3.3 Preventing eavesdropping: TLS</h3>
+
+<p>Before any page content moves, the browser and server run the TLS
+handshake. They agree on algorithms, the server proves its identity with a
+certificate signed by a public key your browser already trusts, and they
+derive shared <em>session keys</em> using key exchange (in TLS 1.3, an ephemeral
+Diffie–Hellman exchange). Everything after this is encrypted and
+authenticated.<sup><a href="#src-4">4</a></sup></p>
+
+<figure>
+  <pre class="mermaid">
+flowchart TD
+  A["ClientHello: supported ciphers, random"] --> B["ServerHello: chosen cipher, key share"]
+  B --> C["Server certificate chain"]
+  C --> D{"Browser: chain valid and trusted?"}
+  D -- No --> E["Connection refused"]
+  D -- Yes --> F["Derive session keys, encrypted handshake completes"]
+  style E fill:#161b22,color:#f85149,stroke:#f85149
+  style F fill:#161b22,color:#7ee787,stroke:#7ee787
+  </pre>
+  <figcaption>Figure 3 — The TLS handshake, simplified.<sup><a href="#src-4">4</a></sup></figcaption>
+</figure>
+
+<h3>3.4 Asking for the page: HTTP</h3>
+
+<p>Over the encrypted connection the browser issues an HTTP request —
+<code>GET /</code> for the page's HTML. The server answers with a status code and
+the document. The browser parses the HTML, discovers further resources
+(CSS, JavaScript, images), and — thanks to <em>keep-alive</em> — reuses the same
+TCP/TLS connection to request many of them, or opens parallel connections to
+fetch several at once.<sup><a href="#src-5">5</a></sup></p>
+
+<figure>
+  <pre class="mermaid">
+flowchart LR
+  A["GET /"] --> B["Server: 200 OK + index.html"]
+  B --> C["Parse HTML"]
+  C --> D["GET style.css, app.js, logo.png"]
+  D --> E["Render page"]
+  style B fill:#161b22,color:#e6edf3,stroke:#4fc3f7
+  </pre>
+  <figcaption>Figure 4 — Serving and assembling one page.</figcaption>
+</figure>
+
+<h2 id="worked-example">4 · Worked example: counting the latency</h2>
+
+<p>Where does the "under a second" go? Say your browser to the server is 50
+milliseconds away one way (RTT = 100&nbsp;ms round-trip), the page is 200&nbsp;KB,
+and the link carries 10&nbsp;Mbps.<sup><a href="#src-6">6</a></sup></p>
+
+<ul>
+  <li><strong>TLS latency:</strong> 2 round trips (TLS 1.3, resumption aside) = 200&nbsp;ms</li>
+  <li><strong>Transmission time of the page:</strong></li>
+</ul>
+
+<p>\[ t_{\text{tx}} = \frac{\text{size}}{\text{bandwidth}} =
+   \frac{200 \times 2^{10} \times 8\ \text{bits}}{10 \times 10^6\ \text{bps}}
+   \approx 0.164\ \text{s} \]</p>
+
+<table>
+  <thead><tr><th>Phase</th><th>Round trips</th><th>Time</th></tr></thead>
+  <tbody>
+    <tr><td>DNS lookup (nothing cached)</td><td>≈ 3</td><td>300 ms</td></tr>
+    <tr><td>TCP handshake</td><td>1</td><td>100 ms</td></tr>
+    <tr><td>TLS handshake</td><td>2</td><td>200 ms</td></tr>
+    <tr><td>Request + first byte</td><td>1</td><td>100 ms</td></tr>
+    <tr><td>Transmit 200 KB</td><td>—</td><td>164 ms</td></tr>
+    <tr><th>Total</th><th></th><th>≈ 0.86 s</th></tr>
+  </tbody>
+</table>
+
+<p>Two things fall out of the table. First, latency — not bandwidth — dominates
+small, interactive pages, which is why DNS and handshake round trips matter
+so much. Second, DNS is amortized: a cached lookup turns 300&nbsp;ms into
+nearly nothing on a second visit.</p>
+
+<h2 id="deeper">5 · Deeper layers</h2>
+
+<h3>5.1 The bandwidth–delay product</h3>
+
+<p>How much data can be "in flight" before the sender must stop and wait?</p>
+
+<p>\[ \text{BDP} = \text{bandwidth} \times \text{RTT} =
+   10\ \text{Mbps} \times 0.1\ \text{s} = 1\ \text{Mbit} = 125\ \text{KB} \]</p>
+
+<p>This is the pipe's capacity. If the connection's <em>congestion window</em> is
+smaller than this, the link is under-used; early in a connection TCP's
+congestion window start typically under-fills the pipe, which is why the
+first response byte is slow to stream.<sup><a href="#src-2">2</a></sup></p>
+
+<h3>5.2 Why layers</h3>
+
+<p>DNS, TCP, TLS, and HTTP each solve one problem and ignore the others. DNS
+knows nothing about encryption; TCP knows nothing about web pages. This
+<em>layering</em> is the internet's central design idea — it lets each protocol be
+invented, replaced, and improved independently. (TLS 1.3 shaved TLS handshakes
+from two round trips to one largely without touching anything below
+it.<sup><a href="#src-4">4</a></sup>)</p>
+
+<h2 id="misconceptions">6 · Common misconceptions</h2>
+
+<ul>
+  <li><span class="bad strike">"The internet is a cloud."</span>
+  <span class="good">It is a mesh of physical cables, routers, and data centers — famously
+  including submarine cables whose failures make headline news.</span></li>
+  <li><span class="bad strike">"HTTPS is 'the secure button'."</span>
+  <span class="good">HTTPS is TLS layered over HTTP: it encrypts and authenticates one
+  connection. It does not make the server itself honest, and metadata (who
+  you talked to, when) still leaks.</span></li>
+  <li><span class="bad strike">"One query = one server."</span>
+  <span class="good">A single page can touch DNS resolvers, several authoritative servers,
+  CDN edges, and origin servers — dozens of machines.</span></li>
+</ul>
+
+<h2 id="further">7 · Further exploration</h2>
+
+<ul>
+  <li>Read the actual protocols: <a href="https://www.rfc-editor.org/rfc/rfc1035">RFC 1035</a> (DNS),
+  <a href="https://www.rfc-editor.org/rfc/rfc9293">RFC 9293</a> (TCP),
+  <a href="https://www.rfc-editor.org/rfc/rfc8446">RFC 8446</a> (TLS 1.3) —
+  the source material this page summarizes.</li>
+  <li>Then: HTTP/2 and HTTP/3 (multiplexing; QUIC over UDP), CDN caches, and
+  BGP — how networks find each other.</li>
+</ul>
+
+<h2 id="sources">Sources</h2>
+
+<ol>
+  <li id="src-1">Kurose &amp; Ross, <em>Computer Networking: A Top-Down Approach</em> — textbook on packet-switched networking layers.</li>
+  <li id="src-2">RFC 9293, <em>Transmission Control Protocol</em> (2022) — TCP handshake, sequencing, retransmission. <a href="https://www.rfc-editor.org/rfc/rfc9293">rfc-editor.org</a></li>
+  <li id="src-3">RFC 1035, <em>Domain Names — Implementation and Specification</em> (1987) — DNS resolution and caching. <a href="https://www.rfc-editor.org/rfc/rfc1035">rfc-editor.org</a></li>
+  <li id="src-4">RFC 8446, <em>The Transport Layer Security (TLS) Protocol Version 1.3</em> (2018) — handshake and key exchange. <a href="https://www.rfc-editor.org/rfc/rfc8446">rfc-editor.org</a></li>
+  <li id="src-5">RFC 9110, <em>HTTP Semantics</em> (2022) — requests, status codes, connection reuse. <a href="https://www.rfc-editor.org/rfc/rfc9110">rfc-editor.org</a></li>
+  <li id="src-6">Worked-example parameters (50 ms one-way, 200 KB, 10 Mbps) are illustrative; the arithmetic follows from the defined physics and the bandwidth–delay-product definition in ref. [1].</li>
+</ol>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#161b22',
+      primaryColor: '#0d1117',
+      primaryBorderColor: '#4fc3f7',
+      primaryTextColor: '#c9d1d9',
+      lineColor: '#8b949e',
+      textColor: '#c9d1d9',
+      fontFamily: 'Georgia, serif'
+    },
+    sequence: { actorBkg: '#0d1117', actorBorder: '#4fc3f7', messageTextColor: '#c9d1d9', noteBkgColor: '#161b22' }
+  });
+</script>
+
+<script>
+  const toc = document.getElementById('toc');
+  document.getElementById('nav-toggle').addEventListener('click', () => toc.classList.toggle('open'));
+  toc.addEventListener('click', (e) => { if (e.target.tagName === 'A') toc.classList.remove('open'); });
+
+  const links = [...toc.querySelectorAll('a')];
+  const byId = Object.fromEntries(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        byId[entry.target.id]?.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -75% 0px' });
+  document.querySelectorAll('h2[id]').forEach(h => spy.observe(h));
+</script>
+
+</body>
+</html>
