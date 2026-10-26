@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How obra/superpowers makes a coding agent build software</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]});"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --heading: #e6edf3;
+    --muted: #8b949e; --accent: #d2a8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.75 "Iowan Old Style", "Source Serif 4", Georgia, serif;
+    max-width: 980px; padding: 3rem 1.5rem 6rem;
+    margin-left: max(280px, calc(50% - 380px));
+    overflow-wrap: break-word;
+  }
+  h1, h2, h3, h4 { font-family: Georgia, "Iowan Old Style", "Source Serif 4", serif; color: var(--heading); line-height: 1.25; }
+  h1 { font-size: 2.4rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.65rem; margin-top: 3.25rem; }
+  h3 { font-size: 1.25rem; margin-top: 2.25rem; }
+  h4 { font-size: 1.05rem; margin-top: 1.75rem; }
+  h2[id] { scroll-margin-top: 1rem; }
+  .subtitle { color: var(--muted); font-style: italic; margin-top: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p, li { text-wrap: pretty; }
+  /* Prose stays readable; figures and tables get the full column. */
+  p, ul, ol, h1, h2, h3, h4 { max-width: 72ch; }
+  sup a { color: var(--accent); font-weight: 600; }
+  sup { margin-left: 0.15em; }
+  .panel { background: var(--panel); border-left: 3px solid var(--accent); padding: 1rem 1.5rem; border-radius: 4px; max-width: 72ch; }
+  figure { margin: 2.5rem 0; text-align: center; }
+  figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.75rem; font-style: italic; max-width: 72ch; margin-left: auto; margin-right: auto; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 1.5rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { border-bottom: 1px solid #21262d; padding: 0.55rem 0.9rem; text-align: left; vertical-align: top; }
+  th { color: var(--heading); white-space: nowrap; }
+  td code { white-space: nowrap; }
+  code { background: var(--panel); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  pre { background: var(--panel); padding: 1rem 1.25rem; border-radius: 4px; overflow-x: auto; max-width: 100%; font-size: 0.88rem; line-height: 1.55; }
+  pre code { background: none; padding: 0; white-space: pre; }
+  .strike { text-decoration: line-through; text-decoration-color: #f85149; }
+  .good { color: #7ee787; }
+  .bad { color: #f85149; }
+  .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }
+  nav#toc {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    overflow-y: auto; padding: 2.5rem 1.25rem; background: var(--panel);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.95rem;
+    z-index: 10;
+  }
+  nav#toc .toc-title { color: var(--heading); font-weight: 700; margin-bottom: 1.25rem; }
+  nav#toc a { display: block; padding: 0.35rem 0.6rem; color: var(--muted); border-left: 2px solid transparent; }
+  nav#toc a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(210,168,255,0.08); }
+  #nav-toggle { display: none; }
+  @media (max-width: 1100px) {
+    body { margin-left: auto; margin-right: auto; padding-top: 5rem; max-width: 100%; }
+    nav#toc {
+      transform: translateX(-100%); transition: transform 0.25s ease; width: 85vw; max-width: 320px;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.5); padding-top: 5rem;
+    }
+    nav#toc.open { transform: translateX(0); }
+    #nav-toggle {
+      display: block; position: fixed; top: 1rem; left: 1rem; z-index: 20;
+      background: var(--panel); color: var(--heading); border: 1px solid var(--muted);
+      border-radius: 4px; padding: 0.45rem 0.9rem; font-size: 1.15rem; cursor: pointer;
+    }
+  }
+  .mermaid { background: var(--panel); border-radius: 6px; padding: 1.5rem; overflow-x: auto; max-width: 100%; }
+
+  /* Figure 1: collapsible, zoomable diagram */
+  #fig-pipeline { text-align: left; }
+  .fig-toolbar {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+    margin-bottom: 0.6rem; font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .fig-toolbar button {
+    background: var(--panel); color: var(--muted); border: 1px solid #30363d;
+    border-radius: 4px; padding: 0.3rem 0.8rem; font-size: 0.85rem; cursor: pointer;
+  }
+  .fig-toolbar button:hover { color: var(--heading); border-color: var(--muted); }
+  .fig-toolbar button:disabled { opacity: 0.4; cursor: default; }
+  .fig-toolbar button[aria-pressed="true"] {
+    color: var(--accent); border-color: var(--accent); background: rgba(210,168,255,0.08);
+  }
+  #fig-pipeline .fig-body {
+    overflow: auto; max-height: 85vh; background: var(--panel); border-radius: 6px;
+  }
+  /* One scroll container only: the body. The inner <pre> must not scroll too. */
+  #fig-pipeline .fig-body > pre.mermaid {
+    margin: 0; flex: 0 0 auto; overflow: visible; max-width: none; max-height: none;
+    background: transparent; padding: 0; line-height: normal;
+    display: flex; align-items: flex-start; justify-content: flex-start;
+  }
+  #fig-pipeline .fig-body svg { display: block; vertical-align: top; }
+  #fig-pipeline.fit .fig-body > pre.mermaid { width: 100%; }
+  #fig-pipeline.fit .fig-body > pre.mermaid { width: 100%; }
+  #fig-pipeline.fit .fig-body svg { max-width: 100%; height: auto; }
+  #fig-pipeline.natural .fig-body > pre.mermaid { display: block; padding: 1.5rem; }
+  #fig-pipeline.fit .fig-body { max-height: none; }
+  /* Natural size: let the SVG paint at its own viewBox dimensions and scroll. */
+  /* Natural size: the module script pins the SVG to its viewBox size. */
+  #fig-pipeline.natural .fig-body svg { max-width: none !important; }
+  #fig-pipeline .fig-hint {
+    color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0.5rem 0 0;
+    max-width: none;
+  }
+  #fig-pipeline.collapsed .fig-body { display: none; }
+
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" aria-label="Toggle table of contents">☰</button>
+
+<nav id="toc" aria-label="Table of contents">
+  <div class="toc-title">On this page</div>
+  <a href="#prerequisites">1 · Prerequisites</a>
+  <a href="#big-picture">2 · Big picture</a>
+  <a href="#mechanism">3 · The mechanism, step by step</a>
+  <a href="#worked-example">4 · Worked example: Task 3 of a real plan</a>
+  <a href="#artifacts">5 · The artifact inventory</a>
+  <a href="#deeper">6 · Deeper layers</a>
+  <a href="#misconceptions">7 · Common misconceptions</a>
+  <a href="#further">8 · Further exploration</a>
+  <a href="#sources">Sources</a>
+</nav>
+
+<h1>How Superpowers makes a coding agent build software</h1>
+<p class="subtitle">A plugin of 15 markdown files that turns a code-generating agent into a wait-for-approval, test-first, reviewed, hand-off-ready engineering process.</p>
+
+<p>You type "let's build a React todo list" into an AI coding agent. The default
+failure mode is famous: it starts writing files within seconds, invents
+requirements you never mentioned, and hands you something that mostly works and
+is partly untested. <a href="https://github.com/obra/superpowers">obra/superpowers</a>
+(by Jesse Vincent and Prime Radiant, MIT-licensed) is a plugin that changes that
+default. It is not a code generator, a model, or a framework. It is a set of
+written procedures — <em>skills</em> — plus a small bootstrap that makes an agent
+load and obey them, plus a handful of shell scripts and prompt templates that
+move work between agents as files rather than as chat.<sup><a href="#src-1">1</a></sup><sup><a href="#src-2">2</a></sup></p>
+
+<p>This page traces the mechanism end to end: what the agent is given at
+startup, what it is forced to produce before code exists, how plans are split
+into tasks, how sub-agents are dispatched and reviewed, what files accumulate
+on disk, and where the whole thing is designed to break. It describes the
+repository as of release v7.0.1 (commit <code>2ce8aa1</code>, October 2026). That
+date matters: Superpowers is unusually fast-moving, and earlier versions
+looked quite different.</p>
+
+<div class="panel">
+<p><strong>Scope of this page.</strong> Every factual claim below was checked
+against the repository source, the Agent Skills specification, or the host
+harness documentation, and is cited inline. Worked-example commit SHAs, line
+counts, and test counts in §4 are constructed to show the artifact formats
+faithfully, not lifted from a recorded session; that is stated there and in the
+<a href="#sources">Sources</a>.</p>
+</div>
+
+<h2 id="prerequisites">1 · Prerequisites</h2>
+
+<p>Four ideas carry everything else. None requires prior knowledge of
+Superpowers.</p>
+
+<ul>
+  <li><strong>Agents have tools and a context window.</strong> A "coding agent" is a
+  language model running in a loop: it reads files, edits files, runs
+  commands, reads results, and repeats. Everything it has seen so far sits in
+  its <em>context window</em>. That window is finite and, once full, gets
+  <em>compacted</em> — replaced by a lossy summary. Anything the agent only
+  "remembered" from earlier turns can vanish.<sup><a href="#src-4">4</a></sup></li>
+  <li><strong>Sub-agents are blank-slate agents.</strong> Most harnesses let an
+  agent spawn another agent with its own fresh context and its own instructions,
+  then wait for a short reply. A sub-agent does not inherit the parent's
+  history. It only knows what the dispatch prompt told it.<sup><a href="#src-1">1</a></sup></li>
+  <li><strong>A skill is a markdown file with a description.</strong> Under the open
+  Agent Skills format, a skill is a directory containing a <code>SKILL.md</code> with
+  YAML frontmatter (<code>name</code>, <code>description</code>) and a markdown body. The
+  description is shown to the agent for every installed skill; the body is
+  loaded only when the skill is used. Supporting files — <code>references/</code>,
+  <code>scripts/</code>, <code>assets/</code> — load even later, on demand. This
+  three-level loading is called <em>progressive disclosure</em>.<sup><a href="#src-3">3</a></sup></li>
+  <li><strong>Git plumbing.</strong> <em>Commit</em>, <em>branch</em>, and <em>worktree</em>: a
+  worktree is a second checkout of the same repository in a different directory,
+  on its own branch, sharing one object store. It is how an agent can work
+  without disturbing your current checkout.<sup><a href="#src-8">8</a></sup></li>
+</ul>
+
+<p>Two pieces of engineering vocabulary also recur. <strong>TDD</strong>
+(test-driven development) means write a failing test, <em>watch it fail</em>, write
+the minimum code that passes, then refactor — Red, Green, Refactor.
+<strong>YAGNI</strong> ("you aren't gonna need it") means don't build what nobody
+asked for. Superpowers treats both as rules, not preferences.<sup><a href="#src-6">6</a></sup></p>
+
+<h2 id="big-picture">2 · Big picture</h2>
+
+<p>Superpowers installs into a coding agent through two channels. First, a
+<strong>bootstrap</strong>: at session start (or, depending on harness, on the first
+user message), the plugin injects the full body of one skill,
+<code>using-superpowers</code>, into the conversation. That text tells the agent it
+has skills, that it must check for a matching skill before responding, and
+that if a skill applies it has no choice but to invoke it. Second, the plugin
+<strong>registers the 15 skills</strong> so the agent can list and load them on demand.</p>
+
+<p>From there the work follows a fixed pipeline. Brainstorming pulls intent out
+of you and ends in an approved design document. A git worktree isolates the
+work. A written plan breaks the design into tasks of two to five minutes, each
+with exact file paths, interfaces, and a Red/Green test cycle. Execution —
+either one fresh worker per task, or the session agent itself — lands every
+task through a review gate. Code review and a whole-branch review catch drift.
+A finishing step asks you, explicitly, whether to merge, open a pull request,
+or keep the branch.<sup><a href="#src-1">1</a></sup></p>
+
+<figure id="fig-pipeline">
+  <div class="fig-toolbar" role="group" aria-label="Figure 1 display controls">
+    <button type="button" data-fig-action="expand" aria-pressed="true">Expand diagram</button>
+    <button type="button" data-fig-action="fit" aria-pressed="false">Fit width</button>
+    <button type="button" data-fig-action="natural" aria-pressed="false">Natural size</button>
+  </div>
+  <div class="fig-body" hidden>
+  <pre class="mermaid">
+flowchart LR
+  U0["YOU: build a todo list"] --> S0["1 · BOOTSTRAP<br/>using-superpowers<br/>injected at session start<br/>and after compaction"]
+  S0 --> S1["2 · BRAINSTORM<br/>brainstorming<br/>read the project first,<br/>then ask"]
+  S1 --> U1["YOU ANSWER<br/>one open question per message,<br/>correct each playback,<br/>pick one of 2-3 approaches"]
+  U1 --> S1
+  S1 --> SB["builder check sub-agent<br/>reads the design as its<br/>future builder would"]
+  SB --> U2["YOU ANSWER<br/>the builder check's<br/>'theirs' questions<br/>(one round)"]
+  U2 --> A0["COMMITTED<br/>specs/YYYY-MM-DD-topic-design.md"]
+  A0 --> U3{{"YOU APPROVE<br/>the design doc<br/>HARD GATE"}}
+  U3 --> S2["3 · ISOLATE<br/>using-git-worktrees<br/>create worktree,<br/>verify clean baseline"]
+  S2 --> U4["YOU CONSENT<br/>'protects your<br/>current branch'"]
+  U4 --> S3["4 · PLAN<br/>writing-plans<br/>file map, then tasks with<br/>Interfaces and RED/GREEN steps"]
+  S3 --> A1["COMMITTED<br/>plans/YYYY-MM-DD-feature.md<br/>Global Constraints<br/>Review Focus"]
+  A1 --> U5["YOU CHOOSE<br/>review the plan,<br/>pick execution mode"]
+  U5 --> S4A["5 · EXECUTE<br/>subagent-driven-development<br/>fresh WORKER per task"]
+  U5 --> S4D["5 · EXECUTE<br/>executing-plans<br/>agent implements inline,<br/>same brief and ledger"]
+  S4A --> S4B["test-driven-development<br/>RED: watch it fail<br/>GREEN: minimal code"]
+  S4D --> S4B
+  S4B --> S4C["verification-before-completion<br/>no 'done' claim without<br/>fresh command output"]
+  S4C --> A5["COMMITTED<br/>one commit per task step"]
+  S4A --> A3["SCRATCH<br/>task-N-brief.md<br/>task-N-report.md"]
+  A3 --> A4["SCRATCH<br/>review-BASE..HEAD.diff"]
+  A4 --> R1["requesting-code-review<br/>task reviewer:<br/>spec + quality"]
+  R1 --> R2["fix loop<br/>rounds 1-3 same implementer<br/>4-5 fresh, stronger model<br/>cap 5, then rule and ledger"]
+  R2 --> S4E["systematic-debugging<br/>root cause before any fix"]
+  S4E --> S4B
+  R2 --> A2["SCRATCH<br/>progress.md ledger"]
+  S4A -.-> U7["exception only:<br/>ask when blocked,<br/>or at one of 4 stops"]
+  U7 -.-> S4A
+  A2 --> R3["6 · FINISH<br/>final whole-branch review<br/>most capable model,<br/>then ONE fix wave"]
+  R3 --> S5["finishing-a-development-branch<br/>full suite, environment check,<br/>menu, cleanup"]
+  S5 --> U6["YOU CHOOSE<br/>merge, PR, or keep<br/>discard only if you type 'discard'"]
+  U6 --> A6["REVERSIBLE<br/>merged locally, PR opened,<br/>or branch kept"]
+  R3 -.-> A7["DELETED AT END<br/>scratch workspace goes"]
+
+  classDef you fill:#161b22,color:#e6edf3,stroke:#d2a8ff,stroke-width:2px
+  classDef gate fill:#161b22,color:#f2cc60,stroke:#f2cc60,stroke-width:2px
+  classDef skill fill:#0d1117,color:#c9d1d9,stroke:#8b949e
+  classDef committed fill:#0d1117,color:#7ee787,stroke:#7ee787
+  classDef scratch fill:#0d1117,color:#8b949e,stroke:#8b949e,stroke-dasharray:5 3
+
+  class U0,U1,U2,U4,U5,U6 you
+  class U3,U7 gate
+  class S0,S1,SB,S2,S3,S4A,S4B,S4C,S4D,S4E,R1,R2,R3,S5 skill
+  class A0,A1,A5,A6 committed
+  class A2,A3,A4,A7 scratch
+  </pre>
+  </div>
+  <p class="fig-hint">The diagram is wider than the page: scroll sideways to follow it left to right, or use Fit width for an overview.</p>
+  <figcaption>Figure 1 — The full default path in six phases, with the human decisions and the artifacts each phase leaves behind. <strong style="color:#d2a8ff">Violet</strong> nodes are questions you are asked; <strong style="color:#f2cc60">gold</strong> is the hard gate that forbids building anything before you approve the design; <strong style="color:#7ee787">green</strong> is committed to your repository; <strong>dashed grey</strong> is the git-ignored scratch workspace under <code>.superpowers/sdd/</code>, deleted when the work lands. <code>verification-before-completion</code> and <code>systematic-debugging</code> hang off the execution phase because they fire inside tasks, not between them. Spikes and <code>dispatching-parallel-agents</code> are deliberately left out: this is the default path only.<sup><a href="#src-1">1</a></sup><sup><a href="#src-9">9</a></sup></figcaption>
+</figure>
+
+<p>Figure 1 rewards reading the violet nodes first. There are only six points
+where the run actually stops for you: the brainstorm conversation, the builder
+check's questions, approval of the design document, the worktree consent
+question (only when no isolated workspace exists), the execution-mode choice,
+and the closing integration menu. Everything between them is the agent working
+uninterrupted — which is why the skill boxes vastly outnumber the question
+boxes, and why the skills devote so much text to the rule that a running plan
+does not stop to ask "should I continue?".</p>
+
+<p>Then read the artifact boxes. Two are committed and outlive the run: the
+design document and the plan. One is the permanent record itself: the commits.
+Three kinds are scratch — the progress ledger, the task briefs and reports, and
+the review diffs — written so that context trouble cannot lose work, and deleted
+once the branch is finished. If you remember one thing from the figure, make it
+that asymmetry: the durable outputs are the ones you review before they are
+made, and the disposable ones are the ones the agent uses while making them.</p>
+
+<p>Three design decisions explain most of the structure you are about to see.
+<strong>One: process before craft.</strong> Skills that set <em>how</em> to work
+(brainstorming, debugging, planning) take priority over skills that do
+<em>what</em> to build. <strong>Two: artifacts over conversation.</strong> Design docs,
+plans, task briefs, reports, review packages, and a progress ledger are files,
+because the agent's memory is not reliable across compaction.
+<strong>Three: fresh context as a quality tool.</strong> A reviewer that did not
+write the code, and a worker that never saw the parent's 60,000-token
+history, both catch things the author cannot.<sup><a href="#src-7">7</a></sup></p>
+
+<h2 id="mechanism">3 · The mechanism, step by step</h2>
+
+<figure>
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as You
+  participant A as Agent session
+  participant F as Files on disk
+  participant W as Worker sub-agent
+  participant R as Reviewer sub-agent
+  U->>A: "let's build a todo app"
+  A->>A: bootstrap read at session start
+  A->>U: one open question about intent
+  U->>A: answers
+  A->>U: plays back what it heard, asks next question
+  A->>U: "here are 3 approaches, I recommend B"
+  U->>A: picks B
+  A->>F: writes design doc, runs builder check
+  A->>U: design doc + "approve?"
+  U->>A: approves
+  A->>F: creates worktree, writes plan
+  A->>U: "plan saved. subagent-driven or native?"
+  U->>A: subagent-driven
+  loop every task in the plan
+    A->>F: task brief + BASE commit + ledger line
+    A->>W: dispatch brief, report path, contracts
+    W->>F: code, tests, commits, report file
+    W-->>A: status DONE, commits, one-line test summary
+    A->>F: review package (diff range BASE..HEAD)
+    A->>R: brief, report, diff file, constraints
+    R-->>A: spec verdict + quality verdict
+    A->>F: ledger: task complete (or fix round)
+  end
+  A->>R: final whole-branch review
+  A->>U: menu: merge, PR, or keep
+  </pre>
+  <figcaption>Figure 2 — One iteration of the pipeline as messages and files.<sup><a href="#src-1">1</a></sup><sup><a href="#src-7">7</a></sup></figcaption>
+</figure>
+
+<h3 id="step-1">3.1 Bootstrap: making the agent use skills at all</h3>
+
+<p>A pile of markdown is useless if the agent ignores it. The bootstrap solves
+that problem, and it is worth understanding because it is where the whole
+system's authority comes from.</p>
+
+<p>On Claude Code and several other harnesses, Superpowers registers a
+<code>SessionStart</code> hook, matched to <code>startup</code>, <code>clear</code>, and <code>compact</code>.
+The hook is a small POSIX shell script, <code>hooks/session-start</code>. It reads
+<code>skills/using-superpowers/SKILL.md</code>, escapes it into JSON, wraps it in an
+<code>&lt;EXTREMELY_IMPORTANT&gt;</code> envelope, and prints it in whichever JSON shape
+the current harness consumes — Cursor's <code>additional_context</code>, Claude
+Code's nested <code>hookSpecificOutput.additionalContext</code>, or the SDK-standard
+top-level <code>additionalContext</code>.<sup><a href="#src-2">2</a></sup></p>
+
+<pre><code>{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup|clear|compact",
+        "hooks": [ { "type": "command",
+                     "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start",
+                     "shell": "bash", "async": false } ] }
+    ]
+  }
+}</code></pre>
+
+<p>Two details in that JSON matter more than they look. The matcher includes
+<code>compact</code>, so the bootstrap is re-injected after the context window is
+summarized away — the agent is reminded it has skills precisely when it is
+most likely to have forgotten. And <code>run-hook.cmd</code> is a <em>polyglot</em>
+wrapper: a single file that is valid batch script on Windows and valid shell on
+Unix, so one hook definition works on both.<sup><a href="#src-2">2</a></sup></p>
+
+<p>Other harnesses differ. Antigravity has no session-start event, so there the
+bootstrap arrives by a different route: the agent sees each skill's
+description, and <code>using-superpowers</code>'s description ("Use when starting any
+conversation") prompts the model to load it in its first turn. OpenCode's
+plugin does not use a hook at all; it injects the bootstrap as the first user
+message via the harness's message-transform API, and deliberately skips that
+injection in child sessions so workers do not restart the design workflow their
+parent already authorized.<sup><a href="#src-2">2</a></sup></p>
+
+<p>Four lines of <code>using-superpowers</code> do the enforcement work:</p>
+
+<pre><code>If you think there is even a 1% chance a skill might apply to what you
+are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+
+**Invoke relevant or requested skills BEFORE any response or action** —
+including clarifying questions, exploring the codebase, or checking files.</code></pre>
+
+<p>The rest of that skill is a table of <em>red flags</em> — the exact sentences an
+agent tends to think right before skipping a skill — paired with the reality
+that defeats each one. "This is just a simple question" → "Questions are
+tasks. Check for skills." "I need more context first" → "Skill check comes
+BEFORE clarifying questions." "I remember this skill" → "Skills evolve. Read
+current version."<sup><a href="#src-5">5</a></sup></p>
+
+<p>That table is not decorative. The repo's own skill-authoring guide says these
+tables exist because its authors tested skills by running sub-agents through
+<em>pressure scenarios</em> — "production is down, every minute costs $5k, do you
+read the debugging skill first or fix it now?" — recorded the rationalizations
+the agents produced, and wrote counters for each. Writing skills is itself
+treated as TDD: a skill is not shipped until an agent has been <em>observed
+failing without it</em>.<sup><a href="#src-5">5</a></sup><sup><a href="#src-1">1</a></sup></p>
+
+<h3 id="step-2">3.2 Brainstorming: from a sentence to an approved design</h3>
+
+<p><code>brainstorming</code> triggers on anything creative — a feature, a component,
+"planning anything new, in software or out of it". Its premise is stated in its
+first paragraph: the agent "build[s] what you believe your human partner wants,
+and that belief is usually thinner than it feels."<sup><a href="#src-6">6</a></sup></p>
+
+<p>The skill is strict about the <em>shape</em> of the conversation, not just its
+content:</p>
+
+<ul>
+  <li><strong>Look before you ask.</strong> In an existing project, read the files the
+  user pointed at before sending the first message. Never ask what the project
+  already answers.</li>
+  <li><strong>One question per message.</strong> Each message ends with exactly one
+  sentence-long question and no menu of example answers, because options
+  steer; open questions surface intent. A menu is offered only when the user
+  is stuck.</li>
+  <li><strong>Play it back.</strong> As each part of the picture becomes clear, the
+  agent restates that part in 200–300 words, marks its own guesses as guesses,
+  and asks what is wrong or missing. Playback and questions alternate.</li>
+  <li><strong>Lay out approaches, then write the doc.</strong> Before writing, it
+  presents two or three real ways to build the thing, what each trades off,
+  and a recommendation, and asks the user to choose. Then — not before — it
+  writes the design.</li>
+  <li><strong>Size the work.</strong> A small change gets a short design agreed in chat;
+  a project gets a full written design. If the work grows mid-task, the agent
+  stops and steps up a size.</li>
+</ul>
+
+<p>The full design must be something "a talented builder in the domain could
+plan from without going back to your human partner": intent and why, goals,
+non-goals, anti-goals (what would make this a failure even if it technically
+works), constraints, the approaches considered, the decisions already made, and
+what is explicitly left to the builder. It is written to
+<code>docs/superpowers/specs/YYYY-MM-DD-&lt;topic&gt;-design.md</code> and committed. The repo's
+own history follows its own rule — <code>docs/superpowers/specs/</code> holds design
+documents like <code>2026-05-05-platform-neutral-config-refs-design.md</code>, complete
+with scope, substitution rules, commit plan, verification steps, and
+non-goals.<sup><a href="#src-6">6</a></sup></p>
+
+<p>Before the design reaches you, a <em>builder check</em> runs: a fresh sub-agent is
+told it is "a talented [DOMAIN]" who has been handed this document and cannot
+talk to its author, and is asked to report only the questions it would still
+need answered to plan the work well, ranked by importance, skipping anything
+the document leaves to the builder. The agent sorts the answers into three
+piles — already answered (fix the document), minor (decide it yourself and mark
+it as your call), and theirs (bring to the user in one message).<sup><a href="#src-6">6</a></sup></p>
+
+<div class="panel">
+<p><strong>The hard gate.</strong> <code>brainstorming</code> ends with an explicit
+<code>&lt;HARD-GATE&gt;</code>: "Nothing gets built until your human partner approves the
+design doc… Building includes writing product code, scaffolding, installing
+dependencies, creating projects, and invoking an implementation skill. Reading
+and exploring are fine." Two exceptions exist: the user opted out of the
+questions, or the user approved a labelled throwaway <em>spike</em> — and keeping
+anything a spike produced is a new request that goes back through the gate.
+After approval, the skill instructs the agent to invoke
+<code>superpowers:writing-plans</code> "and no other skill".<sup><a href="#src-6">6</a></sup></p>
+</div>
+
+<p>Note what this replaces. The default failure is not that the agent writes bad
+code; it is that it writes code for a problem it guessed at. Here, all the
+thinking that normally happens as silent guessing happens as a conversation
+with you, and is then frozen in a document you signed off on.</p>
+
+<h3 id="step-3">3.3 Worktree isolation: a clean, verifiable starting point</h3>
+
+<p><code>using-git-worktrees</code> runs after design approval and before any
+implementation. It is written defensively, in three steps.<sup><a href="#src-8">8</a></sup></p>
+
+<p><strong>Step 0, detect existing isolation.</strong> Compare git's Git directory with
+its <em>common</em> Git directory. If they differ, you are already in a linked
+worktree and creating another would be wrong. A submodule guard exists because
+submodules produce the same inequality: if <code>git rev-parse
+--show-superproject-working-tree</code> returns a path, it is a submodule, not a
+worktree. Only in a plain checkout does it ask: "Would you like me to set up an
+isolated worktree? It protects your current branch from changes."</p>
+
+<p><strong>Step 1, create it.</strong> Prefer a native harness tool
+(<code>EnterWorktree</code>, <code>/worktree</code>, a <code>--worktree</code> flag) over calling
+<code>git worktree add</code> yourself, because a native tool keeps the harness's own
+bookkeeping consistent; using git behind its back creates state it cannot see
+or clean up. With no native tool, it falls back to <code>git worktree add</code>,
+choosing a directory in priority order: your declared preference, then an
+existing <code>.worktrees/</code> or <code>worktrees/</code>, then <code>.worktrees/</code> by default.
+Before creating anything project-local it runs <code>git check-ignore</code>, and if
+the directory is <em>not</em> ignored it adds it to <code>.gitignore</code> and commits that
+first — otherwise the entire worktree could get committed into the repo.</p>
+
+<p><strong>Steps 2 and 3, setup and baseline.</strong> Auto-detect the stack
+(<code>npm install</code>, <code>cargo build</code>, <code>poetry install</code>, <code>go mod download</code>) and
+then run the test suite. If the baseline is red, the agent reports the
+failures and asks whether to proceed. This is the point of the exercise: "A
+dirty baseline makes every later failure ambiguous."</p>
+
+<h3 id="step-4">3.4 Writing plans: the plan is the argument, the spec is the authority</h3>
+
+<p><code>writing-plans</code> converts an approved design into a document for "an
+engineer who has not seen this codebase or this spec". The plan opens with a
+fixed header: goal in one sentence, architecture in two or three, tech stack,
+a path to the spec (so the spec "travels with" the plan), a
+<strong>Global Constraints</strong> section of project-wide requirements copied verbatim,
+and a <strong>Review Focus</strong> section naming the handful of input classes or failure
+modes most likely to hurt a real user but that no task's tests exercise. Plans
+are saved to <code>docs/superpowers/plans/YYYY-MM-DD-&lt;feature&gt;.md</code>.<sup><a href="#src-7">7</a></sup></p>
+
+<p>Before defining tasks, the skill maps the files the change will create or
+modify and what each is responsible for, because that mapping is where the
+decomposition gets locked in. Tasks are then drawn to a specific size: "the
+smallest unit that carries its own test cycle and is worth a fresh reviewer's
+gate," which in practice means roughly two to five minutes of work and one
+independently testable deliverable. Setup, configuration, and documentation
+steps get folded into whichever task actually needs them.<sup><a href="#src-7">7</a></sup></p>
+
+<p>Each task is a block of this shape — the real template, abridged only in the
+test body:</p>
+
+<pre><code>### Task 3: Retry wrapper for the sync client
+
+**Files:**
+- Create: `src/sync/retry.py`
+- Test:   `tests/sync/test_retry.py`
+
+**Interfaces:**
+- Consumes: `SyncClient.send(payload: dict) -&gt; Response` (Task 2)
+- Produces: `retry_send(client, payload, attempts=3) -&gt; Response`
+
+- [ ] **Step 1: Write the failing test**
+
+```python
+def test_retries_three_times_then_succeeds():
+    ...
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `pytest tests/sync/test_retry.py -v`
+Expected: FAIL with "cannot import name 'retry_send'"
+
+- [ ] **Step 3: Implement `retry_send(client, payload, attempts=3) -> Response`**
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `pytest tests/sync/test_retry.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/sync/retry.py tests/sync/test_retry.py
+git commit -m "feat: retry failed sync sends"
+```</code></pre>
+
+<p>Three things in that template carry the system's weight:</p>
+
+<ul>
+  <li><strong>The Interfaces block.</strong> Each task's implementer sees only its own
+  task. "Produces" tells later tasks the exact names and types to consume;
+  "Consumes" tells this task what earlier tasks promised. This is what lets
+  independent workers be dispatched in any order without talking to each
+  other.</li>
+  <li><strong>Steps are Red/Green actions with <code>Expected:</code> lines.</strong> "Write the
+  failing test" / "run it and see it fail" / "implement the minimum" / "run it
+  and see it pass" / "commit" are separate steps with checkable results, so the
+  executor can compare reality against the plan one step at a time.</li>
+  <li><strong>A deliberate ceiling on detail.</strong> "A step is done when the implementer
+  can write exactly one reasonable thing from it. That is the whole
+  requirement: unambiguous, not complete." A plan longer than the code it
+  describes has written the code instead; lines that decide nothing ("TBD",
+  "handle edge cases", "add appropriate validation") are the opposite failure.
+  The plan's self-review checks exactly this, along with spec coverage and
+  cross-task type consistency — <code>clearLayers()</code> in Task 3 and
+  <code>clearFullLayers()</code> in Task 7 is the example given.<sup><a href="#src-7">7</a></sup></li>
+</ul>
+
+<p>The plan ends with a handoff that asks you to choose an execution mode:
+<strong>subagent-driven</strong> (a fresh worker and a fresh reviewer per task, then a
+whole-branch review) or <strong>native/inline</strong> (the session agent implements
+everything itself, with one fresh reviewer at the end). The skill's prompt
+template asks the agent to recommend one, in a sentence, based on how coupled
+the tasks are, how many there are, and what a shipped mistake would cost.</p>
+
+<h3 id="step-5">3.5 Execution mode A: subagent-driven development</h3>
+
+<p>Subagent-driven development (SDD) is the thorough mode. Its core principle is
+one line: "Fresh subagent per task + task review (spec + quality) + broad final
+review = high quality, fast iteration."<sup><a href="#src-9">9</a></sup></p>
+
+<p><strong>Setup.</strong> Verify the worktree. Then create the plan's private workspace
+by running <code>bash scripts/sdd-workspace PLAN_FILE</code>, which prints a
+git-ignored directory under <code>&lt;repo-root&gt;/.superpowers/sdd/&lt;plan-basename&gt;/</code>
+and writes a <code>plan-path</code> marker file naming the owning plan. Every artifact
+for this plan — ledger, briefs, reports, review packages — lives there and
+nowhere else, so a second plan in the same checkout cannot overwrite the first
+one's progress. The agent reads the plan once, reads the spec it names, creates
+one todo per task, and runs a <em>pre-flight conflict scan</em>: one row for every
+pair of tasks sharing a file or interface, one row per task checking its own
+internals, each conflict ruled on and written to the ledger before Task 1 is
+dispatched.<sup><a href="#src-9">9</a></sup></p>
+
+<p><strong>The per-task loop.</strong> Four steps, repeated:</p>
+
+<ol>
+  <li><strong>Record BASE, then dispatch the implementer.</strong> <code>git rev-parse
+  HEAD</code> is stored before dispatch — the review range will run from this
+  commit, never from <code>HEAD~1</code> (which silently drops all but the last commit
+  of a multi-commit task). The task's text is extracted to its own file with
+  <code>bash scripts/task-brief PLAN_FILE N</code>; the dispatch prompt references
+  that path as the single source of requirements, plus a one-line explanation
+  of where the task fits, any interfaces from earlier tasks the brief cannot
+  know, the agent's resolution of any ambiguity, and the report-file path.</li>
+  <li><strong>The worker implements.</strong> It reads its brief, asks questions if
+  anything is unclear, implements, runs TDD, commits, self-reviews, writes a
+  full report to its report file, and returns a reply capped at 15 lines:
+  status, commit SHAs, a one-line test summary, concerns, and the report path.</li>
+  <li><strong>Build the review package, dispatch the reviewer.</strong>
+  <code>bash scripts/review-package PLAN_FILE BASE HEAD</code> writes one file
+  containing the commit list, a diffstat, and the full diff with ten lines of
+  context, named <code>review-&lt;base7&gt;..&lt;head7&gt;.diff</code>. The reviewer receives that
+  file's path, the brief, the report, and the binding global constraints, and
+  returns two verdicts: spec compliance (missing / extra / misunderstood) and
+  code quality (Critical / Important / Minor).</li>
+  <li><strong>Fix loop or complete.</strong> Clean review → one line in the ledger:
+  <code>Task N: complete (commits a7..b7, review clean)</code>. Findings → the fix
+  loop. Minor findings never enter it; they are recorded as
+  <code>Task N: minor (deferred): …</code> for the final reviewer to triage.</li>
+</ol>
+
+<figure>
+  <pre class="mermaid">
+flowchart TD
+  S["Setup: worktree, workspace, ledger, pre-flight scan"] --> A["Record BASE = git rev-parse HEAD"]
+  A --> B["task-brief extracts Task N to a file"]
+  B --> C["Dispatch implementer with brief path + report path"]
+  C --> D["Worker: implement, TDD, commit, self-review, write report"]
+  D --> E{"Implementer status"}
+  E -- "DONE" --> F["review-package for BASE..HEAD"]
+  E -- "DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED" --> E2["Handle report: supply context, escalate model, or split task"]
+  E2 --> F
+  F --> G["Dispatch task reviewer with the diff file"]
+  G --> H{"Spec OK and quality approved?"}
+  H -- "yes" --> I["Ledger: Task N complete"]
+  H -- "no" --> J{"Fix rounds used"}
+  J -- "1-3" --> K["Resume the same implementer with findings"]
+  J -- "4-5" --> L["Fresh implementer on a more capable model"]
+  K --> M["Scoped re-review of the fix diff"]
+  L --> M
+  M --> H
+  J -- "cap reached after round 5" --> N["Controller adjudicates: park with ruling, or rule and carry forward"]
+  N --> I
+  I --> O{"Tasks remain?"}
+  O -- "yes" --> A
+  O -- "no" --> P["Final whole-branch review, one fix wave, then finish"]
+  style I fill:#161b22,color:#7ee787,stroke:#7ee787
+  style P fill:#161b22,color:#e6edf3,stroke:#d2a8ff
+  </pre>
+  <figcaption>Figure 3 — The SDD task loop, including the bounded fix loop and the breaker.<sup><a href="#src-9">9</a></sup><sup><a href="#src-10">10</a></sup></figcaption>
+</figure>
+
+<p>Four rules in the dispatch and review steps are the ones most worth copying
+into your own process, because each fixes a failure the maintainers observed:</p>
+
+<ul>
+  <li><strong>Never make a worker read the whole plan.</strong> It gets a brief. A real
+  session's dispatch prompt, they note, once reached 42,000 characters, 99% of
+  which was pasted history from earlier tasks. What a fresh worker needs is its
+  task, the interfaces it touches, and the global constraints — nothing else.</li>
+  <li><strong>Workers never dispatch sub-agents</strong> — not helpers, "and above all never
+  spawn a reviewer to check your work." Every worker-spawned reviewer
+  duplicated the review the controller was already going to dispatch, at full
+  cost.</li>
+  <li><strong>Never dispatch two implementation workers in parallel</strong>, because they
+  would conflict. (Parallelism belongs to read-only work: the
+  <code>dispatching-parallel-agents</code> skill is for independent investigations.)</li>
+  <li><strong>Never pre-judge the reviewer.</strong> If the prompt you are writing contains
+  "do not flag", "don't treat X as a defect", "at most Minor", or "the plan
+  chose", stop — that is pre-judging, usually to spare yourself a review loop.
+  And never tell a reviewer to re-run tests the worker already ran; the worker's
+  report is the test evidence.</li>
+</ul>
+
+<p><strong>Model selection.</strong> A section of the skill that saves real money: match
+model capability to role, and <em>always name the model explicitly</em>, because an
+omitted model inherits the session's model — often the most capable and
+expensive one. Mechanical single-file tasks with a complete spec get the
+cheapest tier; integration and judgement get a standard model; final review is
+dispatched on the most capable model. The skill also notes that turn count,
+not token price, dominates cost: cheap models routinely take two to three times
+as many turns on multi-step work.<sup><a href="#src-9">9</a></sup></p>
+
+<div class="panel">
+<p><strong>"Rulings, not stalls."</strong> A running plan does not wait for a human. When
+a conflict, ambiguity, or plan defect appears, the controller decides, using
+the spec as the binding authority and the plan as its argument, and writes
+<code>Ruling: &lt;what you decided&gt; — &lt;why&gt; — &lt;what it costs if wrong&gt;</code> into the
+ledger. The skill's justification is blunt: "A wrong ruling costs rework your
+human partner can see and undo; a session parked on a question costs their
+whole day and buys nothing." Exactly four things stop an execution run: an
+irreversible or destructive operation; a security-sensitive action; a side
+effect outside the worktree that norms say to ask about first (a merge, a push
+to a shared branch, a publish); and a plan so broken that every path forward
+is a guess.<sup><a href="#src-9">9</a></sup></p>
+</div>
+
+<h3 id="step-6">3.6 Execution mode B: executing plans inline</h3>
+
+<p>SDD pays for a fresh implementer and a fresh reviewer on every task, each
+re-reading the codebase from zero. Inline execution pays for one context — the
+session's — plus a single reviewer at the end. It is the cheap mode, and the
+skill is candid about what it gives up: no fresh context per task and no second
+pair of eyes per task. It compensates by other means: "the brief is the spec,
+the ledger is your memory, TDD is the per-task gate, and the final reviewer is
+the second pair of eyes."<sup><a href="#src-11">11</a></sup></p>
+
+<p>Mechanically it is the same ledger, the same workspace, and the same plan
+format — the two skills explicitly share them, "so a plan can change executors
+mid-flight and the new one resumes from the same ledger." The differences are
+that the session agent is the implementer, and that completion is recorded by a
+script rather than a reviewer: <code>scripts/task-done PLAN_FILE N BASE -- &lt;test
+command&gt;</code> runs the tests, keeps full output in the workspace, prints the tail,
+and only appends the ledger line if they pass. A failing run records nothing.
+TDD is loaded as a required sub-skill before Task 1, and the final review is
+still dispatched to a fresh reviewer on the most capable model.</p>
+
+<h3 id="step-7">3.7 The innermost loop: TDD and the evidence rules</h3>
+
+<p>Every task, in either mode, ends in the same enforcement: <code>test-driven-
+development</code>, whose Iron Law is a single sentence — <code>NO PRODUCTION CODE
+WITHOUT A FAILING TEST FIRST</code> — and whose consequence is unusual: "Write code
+before the test? Delete it. Start over… Don't keep it as 'reference.' Don't
+'adapt' it while writing tests. Don't look at it. Delete means delete."<sup><a href="#src-6">6</a></sup></p>
+
+<p>Why so absolute? Because the skill's argument is about proof, not purity:
+"Tests written after pass immediately — which proves nothing. You never
+watched it fail, so you never proved it can catch the bug." A test that passes
+the moment you write it is a finding about the test. This is why plans give
+each test step an <code>Expected: FAIL with "&lt;message&gt;"</code> line — the executor must
+compare the real failure text to the predicted one, and a failure for the wrong
+reason is not a Red.</p>
+
+<p>The companion skill, <code>verification-before-completion</code>, closes the same loop
+at the level of claims: <code>NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION
+EVIDENCE</code>. Before saying a task is done, the agent identifies the command that
+would prove it, runs the full command, reads the full output, and only then
+makes the claim. "Should pass" is disallowed; "Agent said success" is
+disallowed — check the diff.<sup><a href="#src-12">12</a></sup></p>
+
+<h3 id="step-8">3.8 Debugging: four phases and a three-fix ceiling</h3>
+
+<p><code>systematic-debugging</code> is the other skill that fires constantly. Its Iron
+Law: <code>NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST</code>. Phase 1 reads the
+error properly, reproduces it reliably, checks recent changes, and — in
+multi-component systems — adds instrumentation at each boundary and runs once
+to see <em>where</em> the break is, before forming any theory. Phase 2 finds a
+working example and lists every difference. Phase 3 states a single hypothesis
+and tests it with the smallest possible change. Phase 4 writes the failing test
+that reproduces the bug, implements one fix, verifies, and only then claims
+success.<sup><a href="#src-13">13</a></sup></p>
+
+<p>The most interesting number in the skill is an architectural tripwire: if
+three fixes have failed, stop fixing and question the architecture. "This is
+NOT a failed hypothesis — this is a wrong architecture." Escalating at three
+turns an endless guessing loop into a design conversation.</p>
+
+<h3 id="step-9">3.9 Reviews, finishes, and the human decisions</h3>
+
+<p>Reviews are task-scoped gates, then one broad gate. The task reviewer
+verifies the diff against the brief (nothing missing, nothing extra, nothing
+misunderstood) and against quality, with the instruction "Do not trust the
+report… Design rationales in the report are claims too… a stated rationale
+never downgrades a finding's severity." When every task is done, a
+whole-branch review runs on the most capable model, against a package spanning
+<code>git merge-base main HEAD..HEAD</code>, pointed at the ledger's deferred-minor and
+parked lines so it can triage them. Findings get exactly <strong>one</strong> fix wave and
+one scoped re-review — never per-finding fixers, and no second wave.<sup><a href="#src-9">9</a></sup><sup><a href="#src-10">10</a></sup></p>
+
+<p>Then <code>finishing-a-development-branch</code> takes over, and the pattern is the
+same throughout: verify, then ask. It runs the full suite (on the tree about to
+be integrated, not "earlier this session"), detects whether it is in a
+worktree, confirms the base branch, and presents exactly three options — merge
+locally, push and open a pull request, or keep the branch as-is. Discarding
+work is <em>not</em> on the menu; it exists only if you explicitly ask, and then
+requires typing the word <code>discard</code>. Cleanup has an ownership rule: it removes
+worktrees under <code>.worktrees/</code> or <code>worktrees/</code> (the ones it created) and
+leaves everything else, because that belongs to your environment. And if
+removal is <em>refused</em> because untracked files exist, it never force-removes —
+it shows you the files and asks.<sup><a href="#src-14">14</a></sup></p>
+
+<h2 id="worked-example">4 · Worked example: Task 3 of a real plan</h2>
+
+<p>Numbers won't illustrate a process, so this example traces one task through
+every artifact it touches. The plan is a small one — a CLI that syncs records
+over an unreliable network API. Suppose Tasks 1 and 2 have already been
+completed and reviewed; the ledger starts like this:</p>
+
+<pre><code># SDD ledger — plan: docs/superpowers/plans/2026-03-02-record-sync.md
+Pre-flight: Task 3 produces retry_send consumed by Task 4's bulk path. No conflict.
+Task 1: complete (commits 4b1c9e2..7d0a3f1, review clean)
+Task 2: complete (commits 7d0a3f1..a55e0b8, review clean)</code></pre>
+
+<p><strong>Step 1 — record BASE and cut the brief.</strong> Before dispatching, the
+controller records <code>BASE = a55e0b8</code> (Task 2's head, which is where Task 3's
+change begins) and runs <code>task-brief</code>. The extractor's <code>awk</code> walks the
+plan, tracking fenced code blocks so a <code>### Task 3</code> heading quoted <em>inside</em>
+a code sample cannot fool it, and writes the task's text through the next task
+heading:</p>
+
+<pre><code>$ bash scripts/task-brief docs/superpowers/plans/2026-03-02-record-sync.md 3
+wrote /repo/.superpowers/sdd/2026-03-02-record-sync/task-3-brief.md: 41 lines</code></pre>
+
+<p><strong>Step 2 — dispatch the worker.</strong> The dispatch prompt is short by design:
+where this fits ("third of nine tasks; it wraps the client Task 2 built"),
+the brief path as the source of requirements, one interface from Task 2 the
+brief cannot know, the report path, and the contracts. The worker asks no
+questions, implements, and runs TDD:</p>
+
+<pre><code>RED   pytest tests/sync/test_retry.py -v
+      FAILED  ImportError: cannot import name 'retry_send'   <span class="good">expected reason</span>
+GREEN pytest tests/sync/test_retry.py -v
+      1 passed                                               <span class="good">minimal code</span>
+SUITE pytest -q
+      47 passed                                              <span class="good">full suite clean</span>
+$ git add src/sync/retry.py tests/sync/test_retry.py
+$ git commit -m "feat: retry failed sync sends"
+   [sync-api d31f2a4] feat: retry failed sync sends</code></pre>
+
+<p>It writes <code>task-3-report.md</code> with the RED command, the failing output, why
+the failure was expected, the GREEN output, the files changed, and its
+self-review notes. Its reply to the controller is four lines:</p>
+
+<pre><code>Status: DONE
+Commits: d31f2a4 feat: retry failed sync sends
+Tests: 47/47 passing, output pristine
+Report: /repo/.superpowers/sdd/2026-03-02-record-sync/task-3-report.md</code></pre>
+
+<p><strong>Step 3 — package and review.</strong> The controller runs
+<code>review-package PLAN a55e0b8 d31f2a4</code>. Two guard checks inside the script
+matter: it exits 3 if <code>d31f2a4</code> is not a descendant of <code>a55e0b8</code>, and exits 3
+if the range is empty — both symptoms of being on the wrong branch would
+otherwise produce a silently bogus review package. The package is one file:</p>
+
+<pre><code># Review package: a55e0b8..d31f2a4
+
+## Commits
+d31f2a4 feat: retry failed sync sends
+
+## Files changed
+ src/sync/retry.py       | 31 +++++++++++++++++
+ tests/sync/test_retry.py| 24 +++++++++
+
+## Diff
+(two hunks with ten lines of context)</code></pre>
+
+<p>The reviewer reads that one file, reads the brief and the report, and returns:</p>
+
+<pre><code>### Spec Compliance
+- ❌ NotImplemented: "Sleep between attempts with backoff `0.1 * 2**n`
+  seconds", brief step 3 — no sleep in `retry_send` (src/sync/retry.py:14-28)
+- ✅ Return type matches the Interfaces block (`Response`)
+- ⚠️ Cannot verify from diff: Task 4's use of `retry_send` in the bulk path
+
+### Strengths
+- Failure message asserted verbatim from the brief; test fails for the
+  expected reason (tests/sync/test_retry.py:8-19)
+
+### Issues
+#### Critical (Must Fix)
+- Retry loop catches bare `Exception` (src/sync/retry.py:22) and would
+  retry a permanent 400 the same as a 503.
+
+#### Important (Should Fix)
+- No backoff between attempts (spec: `0.1 * 2**n`)
+
+#### Minor (Nice to Have)
+- Constant `3` inline; name it (src/sync/retry.py:12)
+
+### Assessment
+**Task quality:** Needs fixes</code></pre>
+
+<p><strong>Step 4 — fix loop, round 1 of 5.</strong> Spec ❌ triggers the loop. The worker
+is resumed (rounds 1–3 resume the original, whose context is intact) with the
+findings verbatim. It writes a test proving the backoff first, watches it fail,
+fixes, re-runs the covering tests, appends a fix report, and commits. A <em>scoped</em>
+re-review reads only the fix diff (<code>d31f2a4..e07b911</code>) and verdicts each
+finding ADDRESSED or NOT ADDRESSED. The ledger then records:</p>
+
+<pre><code>Task 3: fix round 1/5 (3 addressed, 0 open — bare-except, backoff, constant;
+        commits d31f2a4..e07b911)
+Task 3: minor (deferred): inline constant 3 — named in fix, test not added
+Task 3: complete (commits a55e0b8..e07b911, review clean)</code></pre>
+
+<p>Count what the artifacts bought. The worker never saw Tasks 1, 2, or 4, so
+its 41-line brief and 5,000-token context stayed cheap. The controller never
+saw the diff, so its context — which still has six tasks to run — stayed clean.
+The reviewer, who wrote neither the code nor the plan, caught a spec item the
+implementer had quietly skipped and a bug the tests did not cover. And if the
+session had been compacted after Task 5, the ledger plus <code>git log</code> would have
+told a new controller exactly where to resume, which commits exist, and which
+decisions had already been ruled on.</p>
+
+<h2 id="artifacts">5 · The artifact inventory</h2>
+
+<p>This is the part people usually get wrong when they describe Superpowers as
+"a prompt pack". The prompts are half of it. The other half is a set of typed,
+on-disk artifacts, each with an owner, a lifetime, and a reason to exist.</p>
+
+<h3>5.1 Shipped in the plugin</h3>
+
+<div class="table-scroll">
+<table>
+  <thead>
+    <tr><th>Artifact</th><th>Where</th><th>What it is, and why it exists</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>SKILL.md</code></td>
+      <td><code>skills/&lt;name&gt;/</code></td>
+      <td>One per skill, 15 in v7.0.1, from 2.9&nbsp;KB (<code>requesting-code-review</code>) to 19.5&nbsp;KB (<code>subagent-driven-development</code>). Frontmatter <code>name</code> and <code>description</code>; body is the procedure. Descriptions state <em>when</em> to use the skill and deliberately never summarize the workflow, because testing showed agents follow the description instead of reading the body.<sup><a href="#src-5">5</a></sup></td>
+    </tr>
+    <tr>
+      <td><code>references/</code></td>
+      <td>inside skill dirs</td>
+      <td>Deep material loaded only when a step needs it: the fix loop, final review, pre-flight scan, report handling, resuming, bug-report scrubbing. This split exists for a mechanical reason — Claude Code re-attaches each skill truncated at 20,000 characters after compaction, and in one reported session a truncated SDD skill lost its five-round fix cap and ran 18 rounds.<sup><a href="#src-15">15</a></sup></td>
+    </tr>
+    <tr>
+      <td>Prompt templates</td>
+      <td><code>*-prompt.md</code></td>
+      <td><code>implementer-prompt.md</code>, <code>task-reviewer-prompt.md</code>, <code>re-review-prompt.md</code>, <code>builder-check-prompt.md</code>, <code>code-reviewer.md</code>. They are the actual interfaces between agents: placeholders become file paths, and the output format section is what makes the reply parseable.</td>
+    </tr>
+    <tr>
+      <td>Helper scripts</td>
+      <td><code>skills/*/scripts/</code></td>
+      <td><code>sdd-workspace</code> (resolve and claim a per-plan directory), <code>task-brief</code> (extract one task), <code>review-package</code> (write a diff bundle), <code>task-start</code> / <code>task-done</code> (inline mode, with the ledger write gated on a green run). Prose tells the agent to call them through <code>bash</code>, not by bare path, because some plugin packagers strip executable bits.<sup><a href="#src-2">2</a></sup></td>
+    </tr>
+    <tr>
+      <td>Bootstrap</td>
+      <td><code>hooks/session-start</code>, <code>hooks/hooks.json</code>, <code>hooks/run-hook.cmd</code></td>
+      <td>The injection described in §3.1. <code>run-hook.cmd</code> is the Windows/Unix polyglot wrapper.</td>
+    </tr>
+    <tr>
+      <td>Plugin manifests</td>
+      <td><code>.claude-plugin/</code>, <code>.codex-plugin/</code>, <code>.cursor-plugin/</code>, <code>.gemini-extension.json</code>, <code>.opencode/plugins/superpowers.js</code>, and others</td>
+      <td>Eleven files declare the same version and are kept in sync by <code>scripts/bump-version.sh</code> from <code>.version-bump.json</code>. The per-harness plugins also carry a <em>tool mapping</em>: since skills speak in actions ("dispatch a subagent", "create a todo"), the OpenCode plugin injects an explicit translation table (<code>task</code> → <code>subagent</code>, <code>todowrite</code> → markdown plan in V2, and so on).</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5.2 Produced while working — committed to your repository</h3>
+
+<div class="table-scroll">
+<table>
+  <thead>
+    <tr><th>Artifact</th><th>Path</th><th>Writer → readers</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Design document (spec)</td>
+      <td><code>docs/superpowers/specs/YYYY-MM-DD-&lt;topic&gt;-design.md</code></td>
+      <td>brainstorming → you, the builder-check sub-agent, the planner. The binding authority for later conflict rulings.</td>
+    </tr>
+    <tr>
+      <td>Implementation plan</td>
+      <td><code>docs/superpowers/plans/YYYY-MM-DD-&lt;feature&gt;.md</code></td>
+      <td>writing-plans → you, then the controller/executor. Contains the Global Constraints and Review Focus sections every later stage reads.</td>
+    </tr>
+    <tr>
+      <td>Commits and branch</td>
+      <td>git</td>
+      <td>Workers commit per task step. Once the scratch workspace is deleted, these are the permanent record — the skill's own words are "the git history is the record now".</td>
+    </tr>
+    <tr>
+      <td>Worktree</td>
+      <td><code>.worktrees/&lt;branch&gt;/</code> by default</td>
+      <td>using-git-worktrees → everyone. Isolation, a clean test baseline, and parallel work without clobbering your checkout.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5.3 Produced while working — scratch, git-ignored, deleted at the end</h3>
+
+<p>All of these live in <code>&lt;repo-root&gt;/.superpowers/sdd/&lt;plan-basename&gt;/</code>. The
+directory writes a self-ignoring <code>.gitignore</code> containing <code>*</code>, so nothing leaks
+into <code>git status</code> without touching a tracked file, and a <code>plan-path</code> marker
+file proves which plan owns the directory.</p>
+
+<div class="table-scroll">
+<table>
+  <thead>
+    <tr><th>Artifact</th><th>Filename</th><th>Writer → readers</th><th>Why it is a file</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Progress ledger</td>
+      <td><code>progress.md</code></td>
+      <td>controller/executor → anyone resuming, the final reviewer, you</td>
+      <td>"The ledger is your recovery map: the commits it names exist in git even when your context no longer remembers creating them." After compaction, trust the ledger and <code>git log</code> over recollection.</td>
+    </tr>
+    <tr>
+      <td>Task briefs</td>
+      <td><code>task-N-brief.md</code></td>
+      <td><code>task-brief</code> → implementer, then task reviewer</td>
+      <td>Lets each role read only its task, in one tool call, with the exact values, instead of loading a 600-line plan.</td>
+    </tr>
+    <tr>
+      <td>Implementer report</td>
+      <td><code>task-N-report.md</code></td>
+      <td>implementer → reviewer, controller, fix rounds</td>
+      <td>Full test evidence (RED command and output, GREEN command and output, suite result) lives here, so the 15-line reply stays cheap. Fix reports are appended to the same file: it is the persistent memory across dispatches.</td>
+    </tr>
+    <tr>
+      <td>Review package</td>
+      <td><code>review-&lt;base7&gt;..&lt;head7&gt;.diff</code></td>
+      <td>controller → reviewer</td>
+      <td>Commit list, diffstat, and full diff with ten lines of context. "The output never enters your own context" — the controller passes a path, not a diff. Named per range, so a re-review gets a distinct fresh file.</td>
+    </tr>
+    <tr>
+      <td>Deferred and parked findings</td>
+      <td>lines inside the ledger</td>
+      <td>controller → final reviewer → you</td>
+      <td>Minors never enter the fix loop. "A roll-up nobody reads is a silent discard," so the final reviewer is pointed at the list, and every <code>Ruling:</code> line is collected into the final message.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Two lifetimes are worth noting. The scratch artifacts are explicitly
+temporary: once the final review is clean and its fixes are merged, the skill
+tells the executor to delete the plan's workspace, because "the git history is
+the record now." The ledger is a recovery map for the run, not an archive of
+it. And a plan can switch executors mid-flight: both execution skills use the
+same ledger format in the same directory, so a new executor resumes at the
+first task without a <code>Task N: complete</code> line — the handoff between modes is
+a file format, not a conversion step.<sup><a href="#src-9">9</a></sup><sup><a href="#src-11">11</a></sup></p>
+
+<h3>5.4 The meta-artifact: skills themselves</h3>
+
+<p><code>writing-skills</code> treats a skill as a testable artifact. The mapping it
+gives is explicit: test case = pressure scenario with a sub-agent; production
+code = the <code>SKILL.md</code>; test fails = the agent violates the rule without the
+skill; test passes = it complies with the skill present; refactor = close the
+loopholes the agent finds.<sup><a href="#src-1">1</a></sup><sup><a href="#src-5">5</a></sup></p>
+
+<p>It also carries the most transferable lesson in the whole repository, and it
+is about <em>form</em>, not content. Match the guidance to the failure type: a rule
+violated under pressure needs a prohibition plus a rationalization table plus
+red flags; output with the wrong <em>shape</em> needs a positive recipe that says what
+the output is, because agents negotiate with prohibitions; a required element
+in something the agent already produces needs a structural slot in a template;
+and behaviour that depends on a condition needs a conditional keyed to an
+observable fact, not an unconditional rule with an exemption clause. They report
+that in head-to-head wording tests on dispatch prompts, the prohibition arm
+produced clearly more of the unwanted content than the recipe arm — and trended
+worse than the no-guidance control. A single "unless it matters" nuance clause,
+appended to a winning recipe, degraded it from consistent to noisy.<sup><a href="#src-5">5</a></sup></p>
+
+<h2 id="deeper">6 · Deeper layers</h2>
+
+<h3>6.1 The equations: context economics and loop termination</h3>
+
+<p>Superpowers' architecture is largely an answer to one constraint: an agent's
+context is finite and does not survive summarization. The skills describe the
+cost of a dispatch in exactly these terms — everything pasted into a prompt
+"stays resident in your context for the rest of the session and is re-read on
+every later turn." For a dispatch of \(P\) bytes re-read at every one of \(t\)
+turns, that is a per-turn tax proportional to the prompt, paid for the whole
+session:</p>
+
+<p>\[ c_{\text{per turn}} \propto \frac{P}{4}\ \text{tokens} \qquad
+   c_{\text{context}} = t \cdot c_{\text{per turn}} \]</p>
+
+<p>The expressions above are this page's illustration of the relationship the
+skills describe; the division by four is a convention for estimating tokens
+from bytes, not a constant Superpowers publishes. What Superpowers states is
+the qualitative claim and its own observed example. The conclusion it draws is
+the architecture: hand artifacts over as <em>files</em>, not
+pasted text, so a task brief costs a path in the controller's context and a
+single read in the worker's. The 42,000-character dispatch quoted in §3.5 is
+the counterexample the rules were written against — roughly ten thousand
+tokens of mostly-pasted history, before the worker does anything.</p>
+
+<p>The same thinking explains the bounded fix loop. Each round costs a fix
+dispatch plus a scoped re-review, and past a point rounds stop converging
+because the failure is structural rather than informational. The skill encodes
+that as a hard cap with an escape hatch rather than an unbounded while-loop:</p>
+
+<p>\[
+  \text{round} \in \{1,\dots,R_{\max}\},\quad R_{\max}=5 \;\Rightarrow\;
+  \begin{cases}
+    \text{resume original implementer}, & \text{round} \le 3,\\[2pt]
+    \text{fresh implementer, model } m+1, & \text{round} \in \{4,5\},\\[2pt]
+    \text{adjudicate and ledger a ruling}, & \text{still open at } R_{\max}.
+  \end{cases}
+\]</p>
+
+<p>Model tier at round \(r\) escalates by one for \(r \ge 4\); the reasoning is
+that "a loop that survives three resumes usually means the implementer cannot
+see its own problem," so fresh eyes and a capability bump come together. The
+controller's own decision is recorded, never silent; a silent discard is
+forbidden.<sup><a href="#src-10">10</a></sup></p>
+
+<h3>6.2 Edge cases the skills handle explicitly</h3>
+
+<ul>
+  <li><strong>A worker says "this is too hard."</strong> That is a success, not a failure. The
+  implementer template states "Bad work is worse than no work. You will not be
+  penalized for escalating," and defines a fourth status, <code>NEEDS_CONTEXT</code>,
+  separate from <code>BLOCKED</code>. Each status routes differently: context problem →
+  supply context and re-dispatch same model; reasoning problem → more capable
+  model; task too large → split it; plan wrong → rule, ledger, re-dispatch with
+  the ruling carried in the dispatch.<sup><a href="#src-9">9</a></sup></li>
+  <li><strong>The plan itself is wrong.</strong> The spec is the authority; the plan is its
+  argument. The smallest change that satisfies the spec wins, ruled and
+  ledgered. "Deviating from the plan without a ledgered ruling is a decision
+  made in secret."</li>
+  <li><strong>The reviewer cannot verify something from the diff.</strong> Reported as a ⚠️
+  item, not as a pass or a fail. The controller then decides whether it is a
+  real gap. The reviewer is also told not to broaden its search: "evidence you
+  cannot see is not evidence that doesn't exist."</li>
+  <li><strong>The maintainer's own plan mandates a defect.</strong> A finding labelled
+  <em>plan-mandated</em> is still a finding — "the plan's authorship does not grade
+  its own work; the human decides."</li>
+  <li><strong>There is no sub-agent tool at all.</strong> Never fabricate a dispatch: run the
+  plan inline, and perform the final review yourself against the package, while
+  telling the user plainly that "a self-review by the author is weaker than a
+  fresh reviewer."</li>
+  <li><strong>A spike.</strong> Explicitly permitted, explicitly outside the process: no tests
+  or minimal ones, not bulletproof, skipping plan and review — and keeping it
+  is a new request that re-enters the design gate.</li>
+  <li><strong>A session went wrong.</strong> <code>diagnosing-superpowers</code> reads the session
+  transcripts from disk, dispatches one analyst per dimension (plan adherence,
+  repeated work, stumbles, cost and time, request conflicts, skill timeline,
+  quality evidence), and reports findings that each cite <code>path:line</code>. "No
+  citation, no finding." It is explicitly forbidden from proposing fixes.<sup><a href="#src-16">16</a></sup></li>
+</ul>
+
+<h3>6.3 The trade-offs, stated plainly</h3>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Dimension</th><th>Subagent-driven</th><th>Inline (native)</th></tr></thead>
+  <tbody>
+    <tr><td>Fresh context per task</td><td>Yes — no context pollution</td><td>No — one context does every task</td></tr>
+    <tr><td>Review gate</td><td>Spec and quality review per task</td><td>One whole-branch review at the end</td></tr>
+    <tr><td>Cost</td><td>A fresh context per task and per review</td><td>One context plus one final reviewer</td></tr>
+    <tr><td>Best for</td><td>Long plans; every task worth a gate</td><td>Fully specified plans; a mid-tier session model</td></tr>
+    <tr><td>Main risk</td><td>Expense; coordination overhead</td><td>Late tasks run on a compacted context</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Three further trade-offs are worth naming. <strong>Rigidity:</strong> the user
+can stall the whole run for one batch of questions, and the fix is escalation
+(the four stops) rather than elasticity — fast, but a badly chosen ruling
+costs visible rework. <strong>Model dependence:</strong> every rule is a markdown
+instruction, so compliance is a property of the model's training and its
+interpretation, not an enforced gate; the entire red-flags apparatus exists
+because instructions can be rationalized around. The maintainers took this
+seriously enough to build <code>diagnosing-superpowers</code> and a separate eval
+harness, <code>superpowers-evals</code>, for testing whether skills actually change
+behaviour.<sup><a href="#src-1">1</a></sup><sup><a href="#src-16">16</a></sup></p>
+
+<h2 id="misconceptions">7 · Common misconceptions</h2>
+
+<ul>
+  <li><span class="bad strike">"Superpowers is an AI model or an agent framework."</span>
+  <span class="good">It is a plugin: markdown procedures, a bootstrap hook, and a few shell
+  scripts. It runs on top of Claude Code, Codex, Cursor, Gemini CLI, OpenCode,
+  Kimi, Pi, Hermes, Muse, and others, and the repo maintains a separate manifest
+  for each.</span></li>
+  <li><span class="bad strike">"It makes the agent write better code in one pass."</span>
+  <span class="good">Its main effect is on <em>when</em> code gets written and <em>what must exist
+  first</em>: no code until an approved design, no production code without a test
+  seen failing, no "done" without a fresh command output, no integration
+  without your choice from a menu. The README's own framing is a methodology,
+  not a generator.</span></li>
+  <li><span class="bad strike">"The plan contains the whole program."</span>
+  <span class="good">A plan that is longer than the code it describes has written the code
+  instead, which the skill's own self-review flags. The plan is "the set of
+  decisions the implementer cannot make alone": files, signatures, interfaces,
+  exact spec values, and the tests.</span></li>
+  <li><span class="bad strike">"Sub-agents remember the conversation."</span>
+  <span class="good">They never inherit it. Everything a worker knows is in its dispatch
+  prompt and the brief it reads. That is why the dispatch includes the report
+  path and the interfaces from earlier tasks, and why the report is a file the
+  fix rounds can append to.</span></li>
+  <li><span class="bad strike">"More agents mean more rigor."</span>
+  <span class="good">The skills repeatedly forbid redundant agents — workers must not spawn
+  reviewers, reviewers must not spawn second reviewers, and a plan may not run
+  two implementation workers at once. Extra agents a worker spawns "duplicate
+  one of them at full cost, and its verdict counts for nothing."</span></li>
+  <li><span class="bad strike">"Approval of the idea means approval of the design."</span>
+  <span class="good">"Approval covers what you showed them. A design doc you haven't written
+  isn't approved." The gate is on the document, not the vibe.</span></li>
+</ul>
+
+<h2 id="further">8 · Further exploration</h2>
+
+<ul>
+  <li>Read the source. <code>skills/using-superpowers/SKILL.md</code> (65 lines) for the
+  bootstrap, then <code>skills/brainstorming/SKILL.md</code> and
+  <code>skills/subagent-driven-development/SKILL.md</code>. The last one is 19.5&nbsp;KB and
+  the most detailed; its <code>references/</code> directory is where the edge-case
+  machinery lives.</li>
+  <li>A worked transcript. Vincent published a long session transcript of
+  Superpowers building a small todo-list app, which is the best way to see the
+  questions, the worktree, and the TDD steps in sequence.<sup><a href="#src-1">1</a></sup></li>
+  <li>The Agent Skills format, if you want to write your own:
+  <a href="https://agentskills.io/specification">agentskills.io/specification</a> —
+  frontmatter fields, progressive disclosure, and the
+  <code>skills-ref validate</code> checker.<sup><a href="#src-3">3</a></sup></li>
+  <li>Contrast with how Claude Code itself documents skills and sub-agents: the
+  harness re-attaches skill bodies across compaction and offers its own
+  <code>context: fork</code> skill execution. Knowing the host limits explains several
+  Superpowers design choices, including its 20,000-character rule.<sup><a href="#src-4">4</a></sup></li>
+  <li>Then read the repo's <code>AGENTS.md</code>, which is a case study in the same
+  philosophy applied to open-source contribution — and a warning about what
+  happens when agents generate pull requests without a human in the loop.</li>
+</ul>
+
+<h2 id="sources">Sources</h2>
+
+<ol>
+  <li id="src-1">obra/superpowers, <em>README.md</em> and Vincent, J., "Superpowers: How I'm using
+  coding agents in October 2025" (9 Oct 2025) — the workflow description, the
+  skills list, the philosophy, and the original bootstrap and pressure-testing
+  rationale. Repository state read at v7.0.1, commit <code>2ce8aa1</code>.
+  <a href="https://github.com/obra/superpowers">github.com/obra/superpowers</a> ·
+  <a href="https://blog.fsck.com/2025/10/09/superpowers/">blog.fsck.com</a></li>
+  <li id="src-2">obra/superpowers source, verified by reading: <code>hooks/session-start</code>,
+  <code>hooks/hooks.json</code>, <code>.opencode/plugins/superpowers.js</code>,
+  <code>.opencode/INSTALL.md</code>, <code>skills/*/scripts/{sdd-workspace,task-brief,review-package}</code>,
+  <code>skills/writing-skills/SKILL.md</code> (script invocation rule), and the eleven
+  manifests listed in <code>.version-bump.json</code>. Establishes the bootstrap
+  mechanism, per-harness tool mapping, and helper-script behaviour.
+  <a href="https://github.com/obra/superpowers/tree/v7.0.1">github.com/obra/superpowers v7.0.1</a></li>
+  <li id="src-3">Agent Skills, <em>Specification</em> — SKILL.md frontmatter, directory
+  conventions, progressive disclosure, and validation. <a href="https://agentskills.io/specification">agentskills.io/specification</a></li>
+  <li id="src-4">Claude Code documentation, <em>Extend Claude with skills</em> — skill
+  locations, frontmatter, live reload, and host behaviour around skill content.
+  <a href="https://code.claude.com/docs/en/skills">code.claude.com/docs/en/skills</a></li>
+  <li id="src-5">obra/superpowers source: <code>skills/using-superpowers/SKILL.md</code>,
+  <code>skills/writing-skills/SKILL.md</code>,
+  <code>skills/writing-skills/references/{discovery.md, persuasion-principles.md}</code> —
+  the invocation rule, red-flag table, description-writing rule, TDD-for-skills
+  mapping, and the "match the form to the failure" guidance on prohibitions
+  versus recipes.</li>
+  <li id="src-6">obra/superpowers source: <code>skills/brainstorming/SKILL.md</code> and
+  <code>builder-check-prompt.md</code> (conversation shape, approach layout, doc contents,
+  hard gate); <code>skills/test-driven-development/SKILL.md</code> (Iron Law, RED-GREEN-
+  REFACTOR, delete-and-restart rule).</li>
+  <li id="src-7">obra/superpowers source: <code>skills/writing-plans/SKILL.md</code> — plan header,
+  task and step structure, interfaces, self-review, execution handoff;
+  <code>skills/subagent-driven-development/SKILL.md</code> §Big picture
+  (artifacts over conversation, fresh context as quality).</li>
+  <li id="src-8">obra/superpowers source: <code>skills/using-git-worktrees/SKILL.md</code> — isolation
+  detection, native-tool preference, <code>check-ignore</code> safety check, baseline
+  verification. Git worktree semantics per <code>git-worktree(1)</code>.</li>
+  <li id="src-9">obra/superpowers source: <code>skills/subagent-driven-development/SKILL.md</code> plus
+  <code>references/{preflight.md, handling-reports.md, batching.md, resuming.md}</code>,
+  <code>implementer-prompt.md</code>, <code>task-reviewer-prompt.md</code> — the task loop,
+  dispatch rules, model selection, rulings-not-stalls, and reviewer contracts.</li>
+  <li id="src-10">obra/superpowers source:
+  <code>skills/subagent-driven-development/references/fix-loop.md</code> and
+  <code>final-review.md</code>, <code>re-review-prompt.md</code> — round cap, implementer
+  escalation, the breaker, and the single final fix wave.</li>
+  <li id="src-11">obra/superpowers source: <code>skills/executing-plans/SKILL.md</code> and
+  <code>scripts/{task-start, task-done}</code> — inline mode, shared ledger, completion
+  contract.</li>
+  <li id="src-12">obra/superpowers source: <code>skills/verification-before-completion/SKILL.md</code> —
+  the evidence gate and its failure table.</li>
+  <li id="src-13">obra/superpowers source: <code>skills/systematic-debugging/SKILL.md</code> — four
+  phases, five root-cause techniques, and the three-fix architecture tripwire.</li>
+  <li id="src-14">obra/superpowers source: <code>skills/finishing-a-development-branch/SKILL.md</code> —
+  test gate, environment detection, the three-option menu, discard confirmation,
+  and worktree ownership during cleanup.</li>
+  <li id="src-15">obra/superpowers, <em>RELEASE-NOTES.md</em>, v7.0.1 and v7.0.0 — the
+  20,000-character compaction truncation, the 18-fix-round incident, and the
+  reference-file split. <a href="https://github.com/obra/superpowers/blob/main/RELEASE-NOTES.md">RELEASE-NOTES.md</a></li>
+  <li id="src-16">obra/superpowers source: <code>skills/diagnosing-superpowers/SKILL.md</code> and
+  <code>AGENTS.md</code>; <code>README.md</code> on the <code>superpowers-evals</code> harness. Establishes
+  the citation discipline and the eval approach to skill quality.</li>
+  <li id="src-17">Worked-example numbers in §4 (commit SHAs, line counts, test counts,
+  reviewer output) are constructed illustrations of the documented artifact
+  formats, not a recorded session. The formats, ledger line syntax, script
+  output shapes, and guard conditions are taken from the scripts and skills
+  cited in [2], [9], and [10].</li>
+</ol>
+
+<script>
+  // Capture Figure 1's Mermaid source before Mermaid rewrites the DOM.
+  // This classic script runs at parse time; the module below is deferred.
+  (() => {
+    const pre = document.querySelector('#fig-pipeline pre.mermaid');
+    if (!pre) return;
+    // textContent is right for the arrows (it keeps "-->"), but it drops the
+    // <br> tags that break each node's lines. innerHTML keeps the <br> tags but
+    // serialises every arrow as "-->". So take innerHTML and decode the
+    // entities back to the characters the author wrote.
+    pre.dataset.src = pre.innerHTML
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&');
+  })();
+</script>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+  const THEME = {
+    background: '#161b22',
+    primaryColor: '#0d1117',
+    primaryBorderColor: '#d2a8ff',
+    primaryTextColor: '#c9d1d9',
+    lineColor: '#8b949e',
+    textColor: '#c9d1d9',
+    fontFamily: 'Georgia, serif'
+  };
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    // <br> gives intra-node line breaks; <b> gives emphasis inside nodes.
+    flowchart: { htmlLabels: true },
+    themeVariables: THEME,
+    sequence: { actorBkg: '#0d1117', actorBorder: '#d2a8ff', messageTextColor: '#c9d1d9', noteBkgColor: '#161b22', actorTextColor: '#e6edf3' }
+  });
+
+  // Figure 1 starts collapsed, and Mermaid measures its diagram while the
+  // container is still hidden — which can yield a degenerate 16x16 SVG.
+  // Re-render that one figure the first time it becomes visible, once the
+  // container has a real width to measure against.
+  const fig = document.getElementById('fig-pipeline');
+  if (!fig) {
+    // Nothing to repair.
+  } else {
+    const body = fig.querySelector('.fig-body');
+    const pre = fig.querySelector('pre.mermaid');
+    let done = false;
+    const repair = async () => {
+      if (done || body.hidden) return;
+      const svg = pre.querySelector('svg');
+      if (!svg) return;
+      const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+      const looksSane = vb.length === 4 && vb[2] > 100 && vb[3] > 100;
+      if (looksSane) { done = true; sizeNatural(); return; }
+      // Mermaid measured this diagram while it was hidden and produced a
+      // degenerate viewBox. Re-render it now that the container has width.
+      try {
+        const source = pre.dataset.src || pre.innerHTML;
+        const { svg: fresh } = await mermaid.render('fig-pipeline-render', source);
+        pre.innerHTML = fresh;
+        done = true;
+        sizeNatural();
+      } catch (err) {
+        console.error('[explainer] figure re-render failed:', err);
+      }
+    };
+    // The pristine source was captured by the classic script above.
+
+    // Mermaid emits width="100%", which collapses to 0 inside a scroll
+    // container. Natural size therefore pins the SVG to its viewBox size.
+    const sizeNatural = () => {
+      const svg = pre.querySelector('svg');
+      if (!svg) return;
+      const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+      if (vb.length !== 4 || !(vb[2] > 100)) return;
+      svg.style.width = vb[2] + 'px';
+      svg.style.height = vb[3] + 'px';
+    };
+    const fitNatural = () => {
+      const svg = pre.querySelector('svg');
+      if (!svg) return;
+      if (!body.hidden && fig.classList.contains('natural')) {
+        sizeNatural();
+      } else {
+        // Fit mode must be able to shrink again: drop the pinned size.
+        svg.style.width = '';
+        svg.style.height = '';
+      }
+    };
+    fig.addEventListener('click', (e) => {
+      if (e.target.closest('[data-fig-action]')) {
+        setTimeout(repair, 80);
+        setTimeout(fitNatural, 140);
+      }
+    });
+    // A previously saved "fit"/"natural" state may already be visible.
+    setTimeout(repair, 1500);
+  }
+</script>
+
+<script>
+  const toc = document.getElementById('toc');
+  document.getElementById('nav-toggle').addEventListener('click', () => toc.classList.toggle('open'));
+  toc.addEventListener('click', (e) => { if (e.target.tagName === 'A') toc.classList.remove('open'); });
+
+  const links = [...toc.querySelectorAll('a')];
+  const byId = Object.fromEntries(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(a => a.classList.remove('active'));
+        byId[entry.target.id]?.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -75% 0px' });
+  document.querySelectorAll('h2[id]').forEach(h => spy.observe(h));
+</script>
+
+<script>
+  // Figure 1 controls: fit width, natural size, collapse. Defaults to collapsed.
+  (() => {
+    const fig = document.getElementById('fig-pipeline');
+    if (!fig) return;
+    const body = fig.querySelector('.fig-body');
+    const buttons = [...fig.querySelectorAll('[data-fig-action]')];
+    const KEY = 'superpowers-explainer-fig1';
+    const MODES = { collapsed: [false, 'none'], natural: [true, 'natural'], fit: [true, 'fit'] };
+    // [bodyVisible, viewMode]
+    const apply = (mode) => {
+      const [visible, view] = MODES[mode] || MODES.collapsed;
+      fig.classList.toggle('collapsed', !visible);
+      fig.classList.toggle('fit', visible && view === 'fit');
+      fig.classList.toggle('natural', visible && view === 'natural');
+      body.hidden = !visible;
+      buttons.forEach(b => {
+        const a = b.dataset.figAction;
+        if (a === 'expand') {
+          b.setAttribute('aria-pressed', String(!visible));
+          b.textContent = visible ? 'Collapse' : 'Expand diagram';
+        } else {
+          // Size buttons are only meaningful while the diagram is open.
+          b.disabled = !visible;
+          b.setAttribute('aria-pressed', String(visible && a === view));
+        }
+      });
+    };
+    let saved = null;
+    try { saved = localStorage.getItem(KEY); } catch { /* storage blocked */ }
+    apply(saved && MODES[saved] ? saved : 'collapsed');
+
+    buttons.forEach(b => b.addEventListener('click', () => {
+      const a = b.dataset.figAction;
+      const current = body.hidden ? 'collapsed' : (fig.classList.contains('fit') ? 'fit' : 'natural');
+      // Expanding opens at natural size: squeezed to the column the flow is unreadable.
+      const next = a === 'expand' ? (current === 'collapsed' ? 'natural' : 'collapsed') : a;
+      apply(next);
+      try { localStorage.setItem(KEY, next); } catch { /* storage blocked */ }
+    }));
+
+    // Mermaid measures the diagram while it is still inside a hidden container,
+    // so it can produce a degenerate viewBox (a 16x16 SVG). Re-render once when
+    // the body first becomes visible, sized against the real container.
+    // Mermaid's re-render of the hidden figure lives in the module script above.
+  })();
+</script>
+
+</body>
+</html>

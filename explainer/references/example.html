@@ -11,32 +11,39 @@
 <style>
   :root {
     --bg: #0d1117; --panel: #161b22; --text: #c9d1d9; --heading: #e6edf3;
-    --muted: #8b949e; --accent: #4fc3f7;
+    --muted: #8b949e; --accent: #4fc3f7; --rule: #30363d;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 17px/1.75 "Iowan Old Style", "Source Serif 4", Georgia, serif;
-    max-width: 75ch; padding: 3rem 1.5rem 6rem;
+    max-width: 980px; padding: 3rem 1.5rem 6rem;
     margin-left: max(280px, calc(50% - 380px));
+    min-width: 0;
   }
   h1, h2, h3 { font-family: Georgia, "Iowan Old Style", "Source Serif 4", serif; color: var(--heading); line-height: 1.25; }
   h1 { font-size: 2.4rem; margin-bottom: 0.25rem; }
   h2 { font-size: 1.65rem; margin-top: 3.25rem; }
   h3 { font-size: 1.25rem; margin-top: 2.25rem; }
+  /* Prose keeps a readable measure; figures and tables use the full column. */
+  p, ul, ol, h1, h2, h3, h4 { max-width: 72ch; }
+  figure, .table-scroll, pre { width: 100%; max-width: 980px; }
   .subtitle { color: var(--muted); font-style: italic; margin-top: 0; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   p, li { text-wrap: pretty; }
   sup a { color: var(--accent); font-weight: 600; }
-  .panel { background: var(--panel); border-left: 3px solid var(--accent); padding: 1rem 1.5rem; border-radius: 4px; }
+  sup { margin-left: 0.15em; }
+  .panel { background: var(--panel); border-left: 3px solid var(--accent); padding: 1rem 1.5rem; border-radius: 4px; max-width: 72ch; }
   figure { margin: 2.5rem 0; text-align: center; }
-  figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.75rem; font-style: italic; }
-  table { border-collapse: collapse; margin: 1.5rem auto; width: 100%; }
-  th, td { border-bottom: 1px solid var(--panel); padding: 0.55rem 0.9rem; text-align: right; }
-  th:first-child, td:first-child { text-align: left; }
+  figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.75rem; font-style: italic; max-width: 72ch; margin-left: auto; margin-right: auto; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 1.5rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { border-bottom: 1px solid var(--rule); padding: 0.55rem 0.9rem; text-align: left; vertical-align: top; }
   th { color: var(--heading); }
   code { background: var(--panel); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.92em; }
+  pre { background: var(--panel); padding: 1rem 1.25rem; border-radius: 4px; overflow-x: auto; max-width: 100%; font-size: 0.88rem; line-height: 1.55; }
+  pre code { background: none; padding: 0; white-space: pre; }
   .strike { text-decoration: line-through; text-decoration-color: #f85149; }
   .good { color: #7ee787; }
   .bad { color: #f85149; }
@@ -58,7 +65,7 @@
     body { margin-left: auto; margin-right: auto; padding-top: 5rem; }
     nav#toc {
       transform: translateX(-100%); transition: transform 0.25s ease; width: 85vw; max-width: 320px;
-      box-shadow: 2px 0 12px rgba(0,0,0,0.5);
+      box-shadow: 2px 0 12px rgba(0,0,0,0.5); padding-top: 5rem;
     }
     nav#toc.open { transform: translateX(0); }
     #nav-toggle {
@@ -67,7 +74,32 @@
       border-radius: 4px; padding: 0.45rem 0.9rem; font-size: 1.15rem; cursor: pointer;
     }
   }
-  .mermaid { background: var(--panel); border-radius: 6px; padding: 1.5rem; }
+  .mermaid { background: var(--panel); border-radius: 6px; padding: 1.5rem; text-align: left; }
+
+  /* Wide-figure viewer: Expand / Fit width / Natural size. */
+  #fig-pipeline { text-align: left; }
+  .fig-toolbar {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+    margin-bottom: 0.6rem; font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .fig-toolbar button {
+    background: var(--panel); color: var(--muted); border: 1px solid var(--rule);
+    border-radius: 4px; padding: 0.3rem 0.8rem; font-size: 0.85rem; cursor: pointer;
+  }
+  .fig-toolbar button:hover { color: var(--heading); border-color: var(--muted); }
+  .fig-toolbar button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  /* One scroll container only: the body. The inner <pre> must never scroll. */
+  #fig-pipeline .fig-body {
+    overflow: auto; max-height: 80vh; background: var(--panel); border-radius: 6px;
+  }
+  #fig-pipeline .fig-body > pre.mermaid {
+    margin: 0; overflow: visible; max-width: none; padding: 1.25rem;
+  }
+  #fig-pipeline.fit .fig-body svg { max-width: 100%; height: auto; }
+  #fig-pipeline.natural .fig-body > pre.mermaid { display: inline-block; }
+  #fig-pipeline.natural .fig-body svg { max-width: none; }
+  .fig-hint { color: var(--muted); font-size: 0.88rem; margin: 0.6rem 0 0; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }
 </style>
 </head>
 <body>
@@ -80,9 +112,10 @@
   <a href="#big-picture">2 · Big picture</a>
   <a href="#mechanism">3 · The mechanism, step by step</a>
   <a href="#worked-example">4 · Worked example: counting the latency</a>
-  <a href="#deeper">5 · Deeper layers</a>
-  <a href="#misconceptions">6 · Common misconceptions</a>
-  <a href="#further">7 · Further exploration</a>
+  <a href="#artifacts">5 · Artifact inventory</a>
+  <a href="#deeper">6 · Deeper layers</a>
+  <a href="#misconceptions">7 · Common misconceptions</a>
+  <a href="#further">8 · Further exploration</a>
   <a href="#sources">Sources</a>
 </nav>
 
@@ -93,7 +126,9 @@
 Underneath that second sits a chain of machinery that took decades to build:
 a name-finding system, a reliable delivery system layered on top of an
 unreliable one, an encrypted conversation, and finally the actual page
-transfer. This page traces that chain end to end.<sup><a href="#src-1">1</a></sup></p>
+transfer. This page traces that chain end to end, names every artifact each
+phase leaves behind, and shows where the load genuinely has to stop and ask a
+human — which is once.<sup><a href="#src-1">1</a></sup></p>
 
 <h2 id="prerequisites">1 · Prerequisites</h2>
 
@@ -120,18 +155,91 @@ transfer. This page traces that chain end to end.<sup><a href="#src-1">1</a></su
 connection to that address. Then — usually — it upgrades that connection to
 an encrypted one. Only then does it ask for the page and receive it.</p>
 
-<figure>
-  <pre class="mermaid">
+<p>Figure 1 adds three things a phase list leaves out. It marks the
+<strong>artifacts</strong> — the cache entry, the open socket, the session keys, the
+rendered page — that each phase leaves behind and the next phase consumes. It
+marks the <strong>decisions</strong> as diamonds, because a cache hit really does skip
+work and a failed certificate really does end the load. And it marks the
+<strong>single point where you are consulted</strong>, in the accent colour: a
+certificate warning. Everything else in this page happens without asking.</p>
+
+<figure id="fig-pipeline">
+  <div class="fig-toolbar" role="group" aria-label="Figure 1 display controls">
+    <button type="button" data-fig-action="expand" aria-pressed="true">Expand diagram</button>
+    <button type="button" data-fig-action="fit" aria-pressed="false">Fit width</button>
+    <button type="button" data-fig-action="natural" aria-pressed="false">Natural size</button>
+  </div>
+  <div class="fig-body" hidden>
+    <pre class="mermaid">
 flowchart LR
-  A["You: example.org"] --> B["1. DNS lookup"]
-  B --> C["2. TCP handshake"]
-  C --> D["3. TLS handshake"]
-  D --> E["4. HTTP request"]
-  E --> F["Page renders"]
-  style A fill:#161b22,color:#e6edf3,stroke:#4fc3f7
-  style F fill:#161b22,color:#e6edf3,stroke:#4fc3f7
-  </pre>
-  <figcaption>Figure 1 — The four phases of loading a web page.</figcaption>
+  U0["<b>YOU</b> · type example.org,<br/>press Enter"]
+
+  P1["<b>1 · DNS</b><br/>resolve the name"]
+  P1a{"answer cached?<br/>browser → OS →<br/>router → resolver"}
+  P1b["walk the hierarchy<br/>root → .org →<br/>authoritative nameserver"]
+  P1c["authoritative server<br/>answers with the record"]
+
+  P2["<b>2 · TCP</b><br/>build a reliable channel"]
+  P2a{"SYN-ACK<br/>received?"}
+  P2b["re-send SYN<br/>after the timeout"]
+
+  P3["<b>3 · TLS</b><br/>make it private"]
+  P3a["ClientHello →<br/>ServerHello →<br/>certificate chain"]
+
+  U1{"<b>YOU</b> · chain valid<br/>and trusted?"}
+
+  P4["<b>4 · HTTP</b><br/>ask for the page"]
+  P4a["parse HTML,<br/>discover CSS / JS / images"]
+  P4b{"connection<br/>reused?"}
+  P4c["open another connection<br/>to the same server"]
+  P4d["server returns<br/>200 OK + index.html"]
+
+  U2["<b>YOU</b> · page is on screen"]
+
+  A1["<b>ARTIFACT</b> · cache entry<br/>name → IP, TTL counted down"]
+  A2["<b>ARTIFACT</b> · open socket<br/>sequence numbers agreed"]
+  A3["<b>ARTIFACT</b> · session keys<br/>symmetric, per connection"]
+  A4["<b>ARTIFACT</b> · rendered page<br/>+ every fetched resource"]
+
+  U0 --> P1 --> P1a
+  P1a -- "hit" --> P2
+  P1a -- "miss" --> P1b
+  P1b --> P1c
+  P1c --> A1
+  A1 --> P2
+
+  P2 --> P2a
+  P2a -- "no" --> P2b
+  P2b --> P2
+  P2a -- "yes" --> A2
+  A2 --> P3
+
+  P3 --> P3a
+  P3a --> U1
+  U1 -- "yes" --> A3
+  U1 -- "no, abort" --> U2
+  A3 --> P4
+
+  P4 --> P4d
+  P4d --> P4a
+  P4a --> P4b
+  P4b -- "yes, same socket" --> P4
+  P4b -- "no" --> P4c
+  P4c --> P4
+  P4a --> A4
+  A4 --> U2
+
+  style U0 fill:#161b22,color:#4fc3f7,stroke:#4fc3f7
+  style U1 fill:#161b22,color:#4fc3f7,stroke:#4fc3f7
+  style U2 fill:#161b22,color:#4fc3f7,stroke:#4fc3f7
+  style A1 fill:#161b22,color:#7ee787,stroke:#7ee787
+  style A2 fill:#161b22,color:#7ee787,stroke:#7ee787
+  style A3 fill:#161b22,color:#7ee787,stroke:#7ee787
+  style A4 fill:#161b22,color:#7ee787,stroke:#7ee787
+    </pre>
+  </div>
+  <p class="fig-hint">The diagram is wider than the page: scroll sideways to follow it left to right, or use Fit width for an overview.</p>
+  <figcaption>Figure 1 — The four phases with their decisions (diamonds), the artifacts each leaves behind (green), and the one point where you are asked anything (accent). A cache hit skips the hierarchy walk; a rejected certificate ends the load.<sup><a href="#src-1">1</a></sup><sup><a href="#src-2">2</a></sup><sup><a href="#src-3">3</a></sup><sup><a href="#src-4">4</a></sup><sup><a href="#src-5">5</a></sup></figcaption>
 </figure>
 
 <h2 id="mechanism">3 · The mechanism, step by step</h2>
@@ -145,7 +253,8 @@ cached, the recursive resolver walks the DNS hierarchy: it asks a
 the <code>.org</code> (top-level domain) server which server knows
 <code>example.org</code>, then asks that <em>authoritative</em> server for the final
 IP address.<sup><a href="#src-3">3</a></sup> The answer comes back with a
-<em>time-to-live</em> — how many seconds it may be cached.</p>
+<em>time-to-live</em> — how many seconds it may be cached. That cache entry is the
+phase's artifact: the next load of the same name never touches the hierarchy.</p>
 
 <h3>3.2 Building a reliable channel: TCP</h3>
 
@@ -169,7 +278,9 @@ sequenceDiagram
 <p>Each byte is numbered. The sender retransmits whatever the receiver does
 not acknowledge; the receiver reassembles the bytes in order before handing
 them to the browser. This is why a download completes correctly even though
-no single network hop guaranteed anything.<sup><a href="#src-2">2</a></sup></p>
+no single network hop guaranteed anything.<sup><a href="#src-2">2</a></sup>
+The handshake's artifact is the socket itself — a pair of agreed sequence
+numbers that both ends will honour for the rest of the connection.</p>
 
 <h3>3.3 Preventing eavesdropping: TLS</h3>
 
@@ -191,8 +302,13 @@ flowchart TD
   style E fill:#161b22,color:#f85149,stroke:#f85149
   style F fill:#161b22,color:#7ee787,stroke:#7ee787
   </pre>
-  <figcaption>Figure 3 — The TLS handshake, simplified.<sup><a href="#src-4">4</a></sup></figcaption>
+  <figcaption>Figure 3 — The TLS handshake, simplified. This is the one branch whose failure is shown to you, rather than retried silently.<sup><a href="#src-4">4</a></sup></figcaption>
 </figure>
+
+<p>The certificate check is the only point in the whole procedure where the
+machine deliberately stops and consults a person, and only when something is
+wrong. Every other failure below is invisible: TCP retries, DNS re-asks,
+HTTP reconnects.</p>
 
 <h3>3.4 Asking for the page: HTTP</h3>
 
@@ -211,8 +327,9 @@ flowchart LR
   C --> D["GET style.css, app.js, logo.png"]
   D --> E["Render page"]
   style B fill:#161b22,color:#e6edf3,stroke:#4fc3f7
+  style E fill:#161b22,color:#7ee787,stroke:#7ee787
   </pre>
-  <figcaption>Figure 4 — Serving and assembling one page.</figcaption>
+  <figcaption>Figure 4 — Serving and assembling one page. Each fetched resource repeats the request, and reuses the socket from Figure 1 when keep-alive allows.</figcaption>
 </figure>
 
 <h2 id="worked-example">4 · Worked example: counting the latency</h2>
@@ -230,6 +347,7 @@ and the link carries 10&nbsp;Mbps.<sup><a href="#src-6">6</a></sup></p>
    \frac{200 \times 2^{10} \times 8\ \text{bits}}{10 \times 10^6\ \text{bps}}
    \approx 0.164\ \text{s} \]</p>
 
+<div class="table-scroll">
 <table>
   <thead><tr><th>Phase</th><th>Round trips</th><th>Time</th></tr></thead>
   <tbody>
@@ -241,15 +359,60 @@ and the link carries 10&nbsp;Mbps.<sup><a href="#src-6">6</a></sup></p>
     <tr><th>Total</th><th></th><th>≈ 0.86 s</th></tr>
   </tbody>
 </table>
+</div>
 
 <p>Two things fall out of the table. First, latency — not bandwidth — dominates
 small, interactive pages, which is why DNS and handshake round trips matter
 so much. Second, DNS is amortized: a cached lookup turns 300&nbsp;ms into
-nearly nothing on a second visit.</p>
+nearly nothing on a second visit. Section 5 makes that concrete, by asking
+which of these costs an artifact actually removes.</p>
 
-<h2 id="deeper">5 · Deeper layers</h2>
+<h2 id="artifacts">5 · Artifact inventory</h2>
 
-<h3>5.1 The bandwidth–delay product</h3>
+<p>Each phase leaves something behind that the next phase consumes, and that a
+later visit can reuse. This is the part a phase list hides: the expensive work
+is the creation of the artifacts, and the fast path is their reuse.</p>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Artifact</th><th>Written by</th><th>Read by</th><th>Lifetime</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>[cached answer]</code><br>name → IP address, plus a TTL</td>
+      <td>The resolver that performed the lookup, at every level of the cache chain</td>
+      <td>The next lookup of the same name, at any level — browser first</td>
+      <td>Seconds to hours, whatever the record's TTL says; expires on its own</td>
+    </tr>
+    <tr>
+      <td><code>[open socket]</code><br>local port, remote port, agreed sequence numbers</td>
+      <td>The TCP handshake</td>
+      <td>The TLS handshake, then every HTTP request on the connection</td>
+      <td>Minutes; closed by either end, or after an idle timeout</td>
+    </tr>
+    <tr>
+      <td><code>[session keys]</code><br>symmetric keys, one per direction</td>
+      <td>The TLS handshake, from the key exchange</td>
+      <td>Every record on that connection, both directions</td>
+      <td>The life of the connection; discarded when it closes</td>
+    </tr>
+    <tr>
+      <td><code>[rendered page]</code><br>DOM, styles, decoded images</td>
+      <td>The browser, after parsing the response and its subresources</td>
+      <td>You; and the HTTP cache, for resources marked cacheable</td>
+      <td>Until navigation; the HTTP cache itself may outlive the tab</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Two of the four survive the run — the DNS cache entry and whatever the HTTP
+cache keeps — and they are the only reason a second visit is faster. The socket
+and the session keys are deliberately thrown away, because a connection that
+outlives its keys is exactly what forward secrecy is meant to prevent.<sup><a href="#src-4">4</a></sup></p>
+
+<h2 id="deeper">6 · Deeper layers</h2>
+
+<h3>6.1 The bandwidth–delay product</h3>
 
 <p>How much data can be "in flight" before the sender must stop and wait?</p>
 
@@ -261,7 +424,7 @@ smaller than this, the link is under-used; early in a connection TCP's
 congestion window start typically under-fills the pipe, which is why the
 first response byte is slow to stream.<sup><a href="#src-2">2</a></sup></p>
 
-<h3>5.2 Why layers</h3>
+<h3>6.2 Why layers</h3>
 
 <p>DNS, TCP, TLS, and HTTP each solve one problem and ignore the others. DNS
 knows nothing about encryption; TCP knows nothing about web pages. This
@@ -270,7 +433,11 @@ invented, replaced, and improved independently. (TLS 1.3 shaved TLS handshakes
 from two round trips to one largely without touching anything below
 it.<sup><a href="#src-4">4</a></sup>)</p>
 
-<h2 id="misconceptions">6 · Common misconceptions</h2>
+<p>The artifact list in §5 is the layering seen from the other side. Each layer
+produces a by-product in its own vocabulary — a name record, a socket, a key
+set — and none of them means anything to the layer above.</p>
+
+<h2 id="misconceptions">7 · Common misconceptions</h2>
 
 <ul>
   <li><span class="bad strike">"The internet is a cloud."</span>
@@ -283,9 +450,13 @@ it.<sup><a href="#src-4">4</a></sup>)</p>
   <li><span class="bad strike">"One query = one server."</span>
   <span class="good">A single page can touch DNS resolvers, several authoritative servers,
   CDN edges, and origin servers — dozens of machines.</span></li>
+  <li><span class="bad strike">"The page loads the same way every time."</span>
+  <span class="good">From a warm DNS cache and a kept-alive socket, the 860 ms in §4
+  collapses to roughly the transmission time — which is why the artifacts, not
+  the phases, are the thing to optimize.</span></li>
 </ul>
 
-<h2 id="further">7 · Further exploration</h2>
+<h2 id="further">8 · Further exploration</h2>
 
 <ul>
   <li>Read the actual protocols: <a href="https://www.rfc-editor.org/rfc/rfc1035">RFC 1035</a> (DNS),
@@ -307,25 +478,18 @@ it.<sup><a href="#src-4">4</a></sup>)</p>
   <li id="src-6">Worked-example parameters (50 ms one-way, 200 KB, 10 Mbps) are illustrative; the arithmetic follows from the defined physics and the bandwidth–delay-product definition in ref. [1].</li>
 </ol>
 
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: 'dark',
-    themeVariables: {
-      background: '#161b22',
-      primaryColor: '#0d1117',
-      primaryBorderColor: '#4fc3f7',
-      primaryTextColor: '#c9d1d9',
-      lineColor: '#8b949e',
-      textColor: '#c9d1d9',
-      fontFamily: 'Georgia, serif'
-    },
-    sequence: { actorBkg: '#0d1117', actorBorder: '#4fc3f7', messageTextColor: '#c9d1d9', noteBkgColor: '#161b22' }
-  });
-</script>
-
 <script>
+  // Capture Figure 1's Mermaid source before Mermaid rewrites the DOM.
+  // This classic script runs at parse time; the module below is deferred.
+  (() => {
+    const pre = document.querySelector('#fig-pipeline pre.mermaid');
+    if (!pre) return;
+    // innerHTML keeps <br>; textContent silently drops it. Entities are
+    // unescaped so "-->" survives the round trip into Mermaid.
+    pre.dataset.src = pre.innerHTML
+      .replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+  })();
+
   const toc = document.getElementById('toc');
   document.getElementById('nav-toggle').addEventListener('click', () => toc.classList.toggle('open'));
   toc.addEventListener('click', (e) => { if (e.target.tagName === 'A') toc.classList.remove('open'); });
@@ -341,6 +505,109 @@ it.<sup><a href="#src-4">4</a></sup>)</p>
     });
   }, { rootMargin: '-10% 0px -75% 0px' });
   document.querySelectorAll('h2[id]').forEach(h => spy.observe(h));
+</script>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+  // startOnLoad: false — Figure 1 begins collapsed, and a diagram inside a
+  // hidden container renders at 16px. It is painted on first expansion.
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    themeVariables: {
+      background: '#161b22',
+      primaryColor: '#0d1117',
+      primaryBorderColor: '#4fc3f7',
+      primaryTextColor: '#c9d1d9',
+      lineColor: '#8b949e',
+      textColor: '#c9d1d9',
+      fontFamily: 'Georgia, serif'
+    },
+    sequence: { actorBkg: '#0d1117', actorBorder: '#4fc3f7', messageTextColor: '#c9d1d9', noteBkgColor: '#161b22' }
+  });
+
+  // Paint every diagram that is not inside the collapsible figure.
+  document.querySelectorAll('pre.mermaid').forEach(async (pre, i) => {
+    if (pre.closest('#fig-pipeline')) return;
+    if (pre.querySelector('svg')) return;
+    try {
+      const { svg } = await mermaid.render(`diagram-${i}`, pre.textContent.trim());
+      pre.innerHTML = svg;
+    } catch (err) {
+      console.error('[explainer] diagram render failed:', err);
+    }
+  });
+
+  // Figure 1: Expand / Fit width / Natural size, persisted per browser.
+  const fig = document.getElementById('fig-pipeline');
+  if (fig) {
+  const body = fig.querySelector('.fig-body');
+  const pre = fig.querySelector('pre.mermaid');
+  const buttons = [...fig.querySelectorAll('[data-fig-action]')];
+  const KEY = 'explainer:fig1-mode';
+  let painted = false;
+
+  const naturalSize = () => {
+    const svg = pre.querySelector('svg');
+    if (!svg) return;
+    const vb = (svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+    if (!(vb.length === 4 && vb[2] > 0)) return;
+    svg.style.width = `${vb[2]}px`;
+    svg.style.height = `${vb[3]}px`;
+  };
+  const clearNaturalSize = () => {
+    const svg = pre.querySelector('svg');
+    if (!svg) return;
+    svg.style.removeProperty('width');
+    svg.style.removeProperty('height');
+  };
+
+  const paint = async () => {
+    if (painted) return;
+    painted = true;
+    try {
+      const { svg } = await mermaid.render('fig-pipeline-svg', pre.dataset.src || pre.textContent);
+      pre.innerHTML = svg;
+    } catch (err) {
+      console.error('[explainer] figure render failed:', err);
+    }
+  };
+
+  const apply = async (mode) => {
+    body.hidden = mode === 'collapsed';
+    fig.classList.toggle('fit', mode === 'fit');
+    fig.classList.toggle('natural', mode === 'natural');
+    buttons.forEach((b) => {
+      const a = b.dataset.figAction;
+      const on = a === 'expand' ? mode !== 'collapsed' : a === mode;
+      b.setAttribute('aria-pressed', String(on));
+    });
+    const expandBtn = buttons.find((b) => b.dataset.figAction === 'expand');
+    if (expandBtn) expandBtn.textContent = mode === 'collapsed' ? 'Expand diagram' : 'Collapse';
+    if (mode === 'collapsed') return;
+    await paint();
+    if (mode === 'natural') naturalSize(); else clearNaturalSize();
+  };
+
+  let saved = 'collapsed';
+  try { saved = localStorage.getItem(KEY) || 'collapsed'; } catch { /* storage blocked */ }
+  if (!['collapsed', 'fit', 'natural'].includes(saved)) saved = 'collapsed';
+  // A first-time reader never lands on a collapsed figure that looks empty.
+  apply(saved);
+
+  buttons.forEach((b) => b.addEventListener('click', async () => {
+    const a = b.dataset.figAction;
+    const current = body.hidden ? 'collapsed' : (fig.classList.contains('fit') ? 'fit' : 'natural');
+    // Expanding from collapsed always opens at natural size: at several
+    // thousand pixels wide, "fit" is an unreadable strip.
+    const next = a === 'expand'
+      ? (current === 'collapsed' ? 'natural' : 'collapsed')
+      : a;
+    await apply(next);
+    try { localStorage.setItem(KEY, next); } catch { /* storage blocked */ }
+  }));
+  }
 </script>
 
 </body>

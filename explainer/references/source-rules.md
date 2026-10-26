@@ -25,6 +25,24 @@ is load-bearing, not decorative.
 content, undated commercial listicles. Wikipedia's value is its lead references
 — mine those, then cite the primary source it points to.
 
+## Reading the artifact itself
+
+For mechanisms that are themselves artifacts — a codebase, a protocol
+implementation, a configuration format, a toolchain — the artifact is the
+strongest available source, and it outranks commentary about it.
+
+- **Cite it by version and commit** where it is versioned (`v7.0.1`, commit
+  `2ce8aa1`), so a reader can check the claim against the same tree.
+- **Quote what the artifact says, not what it is said to say.** If a document
+  claims a word limit, a node cap, or a rule, the claim is only verified if you
+  found that rule in the text. Several plausible rules turn out to be invented
+  on closer reading.
+- **Distinguish reading from running.** A rule you read in source is verified;
+  behaviour you infer from reading it is not, until you run it. Mark inferred
+  behaviour as inferred.
+- Repository READMEs and release notes are the maintainers' own words —
+  institutional-level, citable, but check them against the code they describe.
+
 ## Citation format
 
 - Cite **inline** — a small footnote-style superscript or `<sup>` link — at
@@ -53,3 +71,8 @@ content, undated commercial listicles. Wikipedia's value is its lead references
   need a source or a flag.
 - Worked examples may use individually computed numbers, but the *inputs*
   (constants, unit costs, parameters) are sourced or flagged.
+- **Constructed examples must say they are constructed.** If a worked example
+  uses illustrative identifiers, commit SHAs, line counts or test counts to show
+  an artifact's *shape* rather than recording a real run, that is legitimate —
+  but it is stated in the sources section and, where it matters, in the prose.
+  Do not let a plausible-looking example read as a transcript.
