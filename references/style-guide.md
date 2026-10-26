@@ -61,32 +61,36 @@ fixture of the house style, not an enhancement.
 <figure id="fig-pipeline">
   <div class="fig-toolbar" role="group" aria-label="Figure 1 display controls">
     <button type="button" data-fig-action="expand" aria-pressed="true">Expand diagram</button>
-    <button type="button" data-fig-action="fit" aria-pressed="false">Fit width</button>
+    <button type="button" data-fig-action="fit" aria-pressed="true">Fit width</button>
     <button type="button" data-fig-action="natural" aria-pressed="false">Natural size</button>
   </div>
-  <div class="fig-body" hidden>
+  <div class="fig-body">
     <pre class="mermaid">flowchart LR ...</pre>
   </div>
-  <p class="fig-hint">The diagram is wider than the page: scroll sideways, or use Fit width for an overview.</p>
+  <p class="fig-hint">Shown at Fit width — the whole shape at once. Use Natural size to read the labels; the diagram then scrolls sideways at full size.</p>
   <figcaption>Figure 1 — ...</figcaption>
 </figure>
 ```
 
 Rules that took a long time to get right:
 
-- **Collapsed by default** is a legitimate choice, and the right one for a tall
-  or very wide figure: the page stays readable and the reader expands what they
-  need. Whatever the default, Expanding opens at **natural size** — "fit" on a
-  6,000px diagram is an unreadable strip.
+- **Fit width is the default** for every wide figure: a first-time reader gets
+  an overview of the whole shape, never a collapsed box that looks empty. That
+  is also why the `.fig-body` markup carries no `hidden` attribute — with JS off
+  the body stays visible instead of degrading to a blank box.
+- **Expanding from collapsed opens at natural size.** "Fit" on a 6,000px
+  diagram is an unreadable strip, and a reader who asks to expand has asked for
+  the full-size view. The toolbar's Natural size button is the same view.
 - **The caption stays visible** in every state, and states what to read from
   the figure.
 - **One scroll container.** `.fig-body` scrolls; the inner `pre` never does
   (`overflow: visible`). Two nested scrollers lose the gesture.
 - **Natural size is pinned to the viewBox** in pixels by script, and those
   inline sizes are cleared when switching back to Fit.
-- **The SVG renders on first expansion**, not on load: a diagram inside a
-  hidden container renders at 16px. Initialise Mermaid with
-  `startOnLoad: false` when any figure starts collapsed.
+- **The SVG renders on first display**, never while hidden: a diagram inside a
+  hidden container renders at 16px. Initialise Mermaid with `startOnLoad: false`
+  and paint explicitly — a restored `localStorage` state can start the figure
+  collapsed, and the figure is never measured through a hidden body.
 - **`localStorage` persistence** with a `try/catch` — it throws in some
   privacy modes.
 - **No page overflow at 390px**, in every state.

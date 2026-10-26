@@ -166,10 +166,10 @@ certificate warning. Everything else in this page happens without asking.</p>
 <figure id="fig-pipeline">
   <div class="fig-toolbar" role="group" aria-label="Figure 1 display controls">
     <button type="button" data-fig-action="expand" aria-pressed="true">Expand diagram</button>
-    <button type="button" data-fig-action="fit" aria-pressed="false">Fit width</button>
+    <button type="button" data-fig-action="fit" aria-pressed="true">Fit width</button>
     <button type="button" data-fig-action="natural" aria-pressed="false">Natural size</button>
   </div>
-  <div class="fig-body" hidden>
+  <div class="fig-body">
     <pre class="mermaid">
 flowchart LR
   U0["<b>YOU</b> · type example.org,<br/>press Enter"]
@@ -238,7 +238,7 @@ flowchart LR
   style A4 fill:#161b22,color:#7ee787,stroke:#7ee787
     </pre>
   </div>
-  <p class="fig-hint">The diagram is wider than the page: scroll sideways to follow it left to right, or use Fit width for an overview.</p>
+  <p class="fig-hint">Shown at Fit width — the whole shape at once. Use Natural size to read the labels; the diagram then scrolls sideways at full size.</p>
   <figcaption>Figure 1 — The four phases with their decisions (diamonds), the artifacts each leaves behind (green), and the one point where you are asked anything (accent). A cache hit skips the hierarchy walk; a rejected certificate ends the load.<sup><a href="#src-1">1</a></sup><sup><a href="#src-2">2</a></sup><sup><a href="#src-3">3</a></sup><sup><a href="#src-4">4</a></sup><sup><a href="#src-5">5</a></sup></figcaption>
 </figure>
 
@@ -510,8 +510,9 @@ set — and none of them means anything to the layer above.</p>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 
-  // startOnLoad: false — Figure 1 begins collapsed, and a diagram inside a
-  // hidden container renders at 16px. It is painted on first expansion.
+  // startOnLoad: false — Figure 1 can be collapsed, and a diagram inside a
+  // hidden container renders at 16px. It is never measured while hidden: it
+  // is painted explicitly on first display.
   mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
@@ -590,10 +591,10 @@ set — and none of them means anything to the layer above.</p>
     if (mode === 'natural') naturalSize(); else clearNaturalSize();
   };
 
-  let saved = 'collapsed';
-  try { saved = localStorage.getItem(KEY) || 'collapsed'; } catch { /* storage blocked */ }
-  if (!['collapsed', 'fit', 'natural'].includes(saved)) saved = 'collapsed';
-  // A first-time reader never lands on a collapsed figure that looks empty.
+  let saved = 'fit';
+  try { saved = localStorage.getItem(KEY) || 'fit'; } catch { /* storage blocked */ }
+  if (!['collapsed', 'fit', 'natural'].includes(saved)) saved = 'fit';
+  // First-time readers land on Fit width: an overview, never a collapsed box.
   apply(saved);
 
   buttons.forEach((b) => b.addEventListener('click', async () => {

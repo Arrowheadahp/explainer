@@ -96,9 +96,11 @@ nodes that carry meaning.
   states what to read *out* of the figure, not what it depicts.
 - **Wide figures get the viewer.** A figure that renders wider than the content
   column ships with a toolbar — `Expand` / `Fit width` / `Natural size` — that
-  opens expanded to natural size, persists in `localStorage`, keeps the caption
-  visible when collapsed, and never lets the page overflow at 390px. Write it
-  once per page and reuse it for every wide figure.
+  opens at **Fit width by default** (an overview, never a collapsed box), opens
+  at natural size when a collapsed figure is expanded, persists in
+  `localStorage`, keeps the caption visible when collapsed, and never lets the
+  page overflow at 390px. Write it once per page and reuse it for every wide
+  figure.
 
 Mermaid carries flowcharts and sequence diagrams; hand-written inline SVG is
 better for annotated numeric axes. Both are allowed. The palette rules live in
